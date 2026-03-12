@@ -41,7 +41,7 @@ include(CTest)
 enable_testing()
 
 add_executable(dns_packet_tests
-    tests/dns_packet_tests.cpp
+    tests/test_sanity_check.cpp
 )
 
 target_link_libraries(dns_packet_tests
