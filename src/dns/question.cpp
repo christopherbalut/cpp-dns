@@ -1,1 +1,1 @@
-#include "dns/question.cpp"
+#include "dns/question.hpp"

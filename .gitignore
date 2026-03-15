@@ -1,13 +1,45 @@
+# CMake / build output
 /build/
-/out/
-/.cache/
+/cmake-build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/CTestTestfile.cmake
+/cmake_install.cmake
+/Makefile
 
+# Generated binaries and libraries
 *.o
 *.obj
 *.a
 *.so
-*.dll
+*.so.*
 *.dylib
+*.dll
 *.exe
 *.out
 
+# Dependency / compiler-generated files
+*.d
+*.gcno
+*.gcda
+*.gcov
+
+# Test and CTest artifacts
+/Testing/
+/DartConfiguration.tcl
+cmake_test_discovery_*.json
+*_tests.cmake
+*_include.cmake
+
+# compile database
+compile_commands.json
+
+# Editor / OS junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Local scratch files
+buf.txt

@@ -26,6 +26,7 @@ target_compile_options(cpp_dns
         -Wall
         -Wextra
         -Wpedantic
+        -Werror
 )
 
 add_executable(cpp_dns_app
@@ -38,22 +39,28 @@ target_link_libraries(cpp_dns_app
 )
 
 include(CTest)
-enable_testing()
 
-add_executable(dns_packet_tests
-    tests/test_sanity_check.cpp
-)
+if (BUILD_TESTING)
+    find_package(GTest REQUIRED)
 
-target_link_libraries(dns_packet_tests
-    PRIVATE
-        cpp_dns
-)
+    add_executable(dns_packet_tests
+        tests/test_sanity_check.cpp
+    )
 
-target_compile_options(dns_packet_tests
-    PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
-)
+    target_link_libraries(dns_packet_tests
+        PRIVATE
+            cpp_dns
+            GTest::gtest_main
+    )
 
-add_test(NAME dns_packet_tests COMMAND dns_packet_tests)
+    target_compile_options(dns_packet_tests
+        PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Werror
+    )
+
+    include(GoogleTest)
+    gtest_discover_tests(dns_packet_tests)
+endif()
