@@ -42,4 +42,5 @@ namespace dns {
             BufferError last_error_{BufferError::none};
     };
 
+
 };

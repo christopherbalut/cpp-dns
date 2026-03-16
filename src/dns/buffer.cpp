@@ -45,8 +45,24 @@ namespace dns {
 
     std::span<const std::uint8_t> PacketBuffer::get_range(std::size_t start, std::size_t length) const
     {
-       return 0; 
+        if (start > max_size)
+        {
+            return {};
+        }
+
+        if (length + start > max_size)
+        {
+            return {};
+        }
+
+        std::span<const std::uint8_t> full_view{buffer_};
+        return full_view.subspan(start, length);
     }
 
 
+    std::uint16_t read_u16()
+    {
+        return 0;
+    }
+            std::uint32_t read_u32();
 };
