@@ -10,13 +10,15 @@ namespace dns {
 
     enum class BufferError : std::uint8_t {
         none,
-        end_of_buffer
+        end_of_buffer,
+        position_out_of_bounds
     };
 
     struct ReadByteResult {
         std::uint8_t value{};
         BufferError error{BufferError::none};
     };
+
     class PacketBuffer {
         public:
             static constexpr std::size_t max_size = 512;
@@ -27,7 +29,7 @@ namespace dns {
             void step(std::size_t steps);
             void seek(std::size_t position);
 
-            std::uint8_t read();
+            std::uint8_t read_single_byte();
             [[nodiscard]] std::uint8_t get(std::size_t position) const;
             [[nodiscard]] std::span<const std::uint8_t> get_range(std::size_t start, std::size_t length) const;
 
@@ -41,6 +43,4 @@ namespace dns {
             std::size_t position_{0};
             BufferError last_error_{BufferError::none};
     };
-
-
 };

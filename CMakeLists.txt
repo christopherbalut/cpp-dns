@@ -45,6 +45,7 @@ if (BUILD_TESTING)
 
     add_executable(dns_packet_tests
         tests/test_sanity_check.cpp
+        tests/test_packet_buffer.cpp
     )
 
     target_link_libraries(dns_packet_tests
