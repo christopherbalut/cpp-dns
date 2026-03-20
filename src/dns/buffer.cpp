@@ -104,6 +104,79 @@ namespace dns {
 
     void PacketBuffer::read_qname(std::string& out)
     {
+        out.clear();
+
+        std::size_t pos{position_};
+        bool jumped{false};
+        constexpr std::size_t max_jump{5};
+        std::size_t jumps_performed{};
+
+        std::string delimiter;
+
+        while(true)
+        {
+            if (jumps_performed > max_jump)
+            {
+                std::cout << "read_qname(): position out of bounds\n";
+                return;
+            }
+
+            const std::uint8_t length{get(position_)};
+
+            if (length == 0)
+            {
+                ++pos;
+                break;
+            }
+
+            if ((length & 0xC0) == 0xC0)
+            {
+                if (jumps_performed >= max_jump) // jump protection
+                {
+                    std::cout << "read_qname() has too many compression jumps, exiting ...\n";
+                    return;
+                }
+                if (pos + 1 >= max_jump) {
+                    std::cout << "qname() has an incomplete compression pointer\n";
+                    return;
+                }
+                const std::uint8_t second_byte{get(pos+1)};
+                const std::uint16_t offset{static_cast<std::uint16_t>(((length ^ 0xC0) << 8) | second_byte)};
+
+                if (!jumped)
+                {
+                    seek(pos + 2);
+                }
+
+                pos = offset;
+                jumped = true;
+                ++jumps_performed;
+                continue;
+            }
+
+            ++pos;
+
+        if (pos + length > max_size)
+        {
+            std::cout << "read_qname(): label extends past end of buffer\n";
+            return;
+        }
+
+        out += delimiter;
+
+        const auto label_bytes{get_range(pos,length)};
+        for (const auto byte : label_bytes)
+        {
+            out += static_cast<char>(std::tolower(static_cast<unsigned char>(byte)));
+        }
+        delimiter = ".";
+        pos += length;
+        }
+
+        if(!jumped)
+        {
+            seek(pos);
+        }
         std::cout << out << "\n";
     }
 };
