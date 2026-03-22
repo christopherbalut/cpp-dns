@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "dns/buffer.hpp"
 #include "dns/types.hpp"
 
 namespace dns
@@ -27,5 +28,6 @@ struct DnsHeader
     std::uint16_t authoritative_entries{0};
     std::uint16_t resource_entries{0};    
 
+    void decode(PacketBuffer& buffer);
 };
 } // namespace dns

@@ -2,7 +2,11 @@
 
 #include <cstdint>
 
-enum class ResultCode : std::uint8_t{
+namespace dns
+{
+
+enum class ResultCode : std::uint8_t
+{
     noerror = 0,
     formerr = 1,
     servfail = 2,
@@ -15,13 +19,49 @@ constexpr ResultCode to_result_code(std::uint8_t code)
 {
     switch (code)
     {
-        case 1: return ResultCode::formerr;
-        case 2: return ResultCode::servfail;
-        case 3: return ResultCode::nxdomain;
-        case 4: return ResultCode::notimp;
-        case 5: return ResultCode::refused;
+        case 1:
+            return ResultCode::formerr;
+        case 2:
+            return ResultCode::servfail;
+        case 3:
+            return ResultCode::nxdomain;
+        case 4:
+            return ResultCode::notimp;
+        case 5:
+            return ResultCode::refused;
         case 0:
         default:
             return ResultCode::noerror;
     }
 }
+
+enum class QueryType : std::uint16_t
+{
+    Unknown = 0,
+    A = 1
+};
+
+constexpr std::uint16_t to_code(QueryType type)
+{
+    switch (type)
+    {
+        case QueryType::A:
+            return 1;
+        case QueryType::Unknown:
+        default:
+            return 0;
+    }
+}
+
+constexpr QueryType to_query_type(std::uint16_t code)
+{
+    switch (code)
+    {
+        case 1:
+            return QueryType::A;
+        default:
+            return QueryType::Unknown;
+    }
+}
+
+} // namespace dns
