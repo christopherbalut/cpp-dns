@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include "dns/types.hpp"
+#include <string>
 
 namespace dns
 {
