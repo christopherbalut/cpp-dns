@@ -3,5 +3,5 @@
 int main()
 {
     std::cout << "Hello from main \n";
-    return 1;
+    return 0;
 }

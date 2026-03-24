@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dns/buffer.hpp"
 #include <array>
 #include <cstdint>
 #include <string>
@@ -30,5 +31,7 @@ struct ARecord
 };
 
 using DnsRecord = std::variant<UnknownRecord, ARecord>;
+
+DnsRecord decode_record(PacketBuffer& buffer);
 
 } // namespace dns
