@@ -29,6 +29,7 @@ class PacketBuffer
 
     PacketBuffer();
 
+    void set(std::size_t pos, std::uint8_t value);
     [[nodiscard]] std::size_t position() const;
     void step(std::size_t steps);
     void seek(std::size_t position);

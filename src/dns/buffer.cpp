@@ -8,6 +8,16 @@ namespace dns
 {
 PacketBuffer::PacketBuffer() = default;
 
+void PacketBuffer::set(std::size_t pos, std::uint8_t value)
+{
+    if (pos >= max_size)
+    {
+        return;
+    }
+
+    buffer_[pos] = value;
+}
+
 std::size_t PacketBuffer::position() const
 {
     return position_;
