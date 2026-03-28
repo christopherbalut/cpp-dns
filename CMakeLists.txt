@@ -38,23 +38,38 @@ target_link_libraries(cpp_dns_app
         cpp_dns
 )
 
+target_compile_options(cpp_dns_app
+    PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+)
+
 include(CTest)
 
 if (BUILD_TESTING)
     find_package(GTest REQUIRED)
+    include(GoogleTest)
 
-    add_executable(dns_packet_tests
-        tests/test_sanity_check.cpp
+    add_executable(dns_tests
+        tests/test_dns_header.cpp
+        tests/test_dns_packet.cpp
+        tests/test_dns_question.cpp
+        tests/test_dns_record.cpp
         tests/test_packet_buffer.cpp
+        tests/test_query_type.cpp
+        tests/test_result_code.cpp
+        tests/test_sanity_check.cpp
     )
 
-    target_link_libraries(dns_packet_tests
+    target_link_libraries(dns_tests
         PRIVATE
             cpp_dns
             GTest::gtest_main
     )
 
-    target_compile_options(dns_packet_tests
+    target_compile_options(dns_tests
         PRIVATE
             -Wall
             -Wextra
@@ -62,6 +77,5 @@ if (BUILD_TESTING)
             -Werror
     )
 
-    include(GoogleTest)
-    gtest_discover_tests(dns_packet_tests)
+    gtest_discover_tests(dns_tests)
 endif()

@@ -47,6 +47,7 @@ class PacketBuffer
   private:
     std::array<std::uint8_t, max_size> buffer_{};
     std::size_t position_{0};
+    std::size_t size_{0};
     BufferError last_error_{BufferError::none};
 };
 }; // namespace dns

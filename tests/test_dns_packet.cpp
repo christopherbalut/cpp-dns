@@ -1,0 +1,397 @@
+#include <gtest/gtest.h>
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <string_view>
+#include <variant>
+
+#include "dns/packet.hpp"
+#include "dns/types.hpp"
+
+namespace
+{
+using dns::ARecord;
+using dns::DnsPacket;
+using dns::DnsQuestion;
+using dns::DnsRecord;
+using dns::PacketBuffer;
+using dns::QueryType;
+using dns::UnknownRecord;
+
+std::size_t write_u16(PacketBuffer& buffer, std::size_t pos, std::uint16_t value)
+{
+    buffer.set(pos++, static_cast<std::uint8_t>((value >> 8) & 0xFF));
+    buffer.set(pos++, static_cast<std::uint8_t>(value & 0xFF));
+    return pos;
+}
+
+std::size_t write_u32(PacketBuffer& buffer, std::size_t pos, std::uint32_t value)
+{
+    buffer.set(pos++, static_cast<std::uint8_t>((value >> 24) & 0xFF));
+    buffer.set(pos++, static_cast<std::uint8_t>((value >> 16) & 0xFF));
+    buffer.set(pos++, static_cast<std::uint8_t>((value >> 8) & 0xFF));
+    buffer.set(pos++, static_cast<std::uint8_t>(value & 0xFF));
+    return pos;
+}
+
+std::size_t write_bytes(PacketBuffer& buffer, std::size_t pos,
+                        std::initializer_list<std::uint8_t> bytes)
+{
+    for (const auto byte : bytes)
+    {
+        buffer.set(pos++, byte);
+    }
+
+    return pos;
+}
+
+std::size_t write_pointer(PacketBuffer& buffer, std::size_t pos, std::uint16_t offset)
+{
+    const std::uint16_t pointer = static_cast<std::uint16_t>(0xC000U | offset);
+    return write_u16(buffer, pos, pointer);
+}
+
+std::size_t write_qname(PacketBuffer& buffer, std::size_t pos, std::string_view name)
+{
+    if (name.empty())
+    {
+        buffer.set(pos++, 0);
+        return pos;
+    }
+
+    std::size_t label_start = 0;
+
+    while (label_start < name.size())
+    {
+        const std::size_t dot = name.find('.', label_start);
+        const std::size_t label_end = (dot == std::string_view::npos) ? name.size() : dot;
+        const std::size_t label_len = label_end - label_start;
+
+        buffer.set(pos++, static_cast<std::uint8_t>(label_len));
+
+        for (std::size_t i = label_start; i < label_end; ++i)
+        {
+            buffer.set(pos++, static_cast<std::uint8_t>(name[i]));
+        }
+
+        if (dot == std::string_view::npos)
+        {
+            break;
+        }
+
+        label_start = dot + 1;
+    }
+
+    buffer.set(pos++, 0);
+    return pos;
+}
+
+std::size_t write_header(PacketBuffer& buffer, std::size_t pos, std::uint16_t id,
+                         std::uint16_t flags, std::uint16_t qdcount, std::uint16_t ancount,
+                         std::uint16_t nscount, std::uint16_t arcount)
+{
+    pos = write_u16(buffer, pos, id);
+    pos = write_u16(buffer, pos, flags);
+    pos = write_u16(buffer, pos, qdcount);
+    pos = write_u16(buffer, pos, ancount);
+    pos = write_u16(buffer, pos, nscount);
+    pos = write_u16(buffer, pos, arcount);
+    return pos;
+}
+
+std::size_t write_question(PacketBuffer& buffer, std::size_t pos, std::string_view name,
+                           std::uint16_t qtype, std::uint16_t qclass = 1)
+{
+    pos = write_qname(buffer, pos, name);
+    pos = write_u16(buffer, pos, qtype);
+    pos = write_u16(buffer, pos, qclass);
+    return pos;
+}
+
+std::size_t write_rr_header(PacketBuffer& buffer, std::size_t pos, std::string_view name,
+                            std::uint16_t qtype, std::uint16_t qclass, std::uint32_t ttl,
+                            std::uint16_t rdlength)
+{
+    pos = write_qname(buffer, pos, name);
+    pos = write_u16(buffer, pos, qtype);
+    pos = write_u16(buffer, pos, qclass);
+    pos = write_u32(buffer, pos, ttl);
+    pos = write_u16(buffer, pos, rdlength);
+    return pos;
+}
+
+std::size_t write_compressed_rr_header(PacketBuffer& buffer, std::size_t pos,
+                                       std::uint16_t name_offset, std::uint16_t qtype,
+                                       std::uint16_t qclass, std::uint32_t ttl,
+                                       std::uint16_t rdlength)
+{
+    pos = write_pointer(buffer, pos, name_offset);
+    pos = write_u16(buffer, pos, qtype);
+    pos = write_u16(buffer, pos, qclass);
+    pos = write_u32(buffer, pos, ttl);
+    pos = write_u16(buffer, pos, rdlength);
+    return pos;
+}
+
+std::size_t write_a_record(PacketBuffer& buffer, std::size_t pos, std::string_view name,
+                           std::uint32_t ttl, std::initializer_list<std::uint8_t> addr)
+{
+    pos = write_rr_header(buffer, pos, name, 1, 1, ttl, 4);
+    pos = write_bytes(buffer, pos, addr);
+    return pos;
+}
+
+std::size_t write_unknown_record(PacketBuffer& buffer, std::size_t pos, std::string_view name,
+                                 std::uint16_t qtype, std::uint32_t ttl,
+                                 std::initializer_list<std::uint8_t> rdata)
+{
+    pos =
+        write_rr_header(buffer, pos, name, qtype, 1, ttl, static_cast<std::uint16_t>(rdata.size()));
+    pos = write_bytes(buffer, pos, rdata);
+    return pos;
+}
+
+std::size_t write_compressed_a_record(PacketBuffer& buffer, std::size_t pos,
+                                      std::uint16_t name_offset, std::uint32_t ttl,
+                                      std::initializer_list<std::uint8_t> addr)
+{
+    pos = write_compressed_rr_header(buffer, pos, name_offset, 1, 1, ttl, 4);
+    pos = write_bytes(buffer, pos, addr);
+    return pos;
+}
+} // namespace
+
+TEST(DnsPacketTest, DecodeEmptyPacketParsesHeaderAndLeavesAllSectionsEmpty)
+{
+    PacketBuffer buffer{};
+    const std::size_t end = write_header(buffer, 0, 0x1234, 0x8180, 0, 0, 0, 0);
+
+    DnsPacket packet{};
+    packet.decode_from_buffer(buffer);
+
+    EXPECT_EQ(packet.header.id, 0x1234);
+    EXPECT_TRUE(packet.header.response);
+    EXPECT_TRUE(packet.header.recursion_desired);
+    EXPECT_TRUE(packet.header.recursion_available);
+    EXPECT_EQ(packet.header.questions, 0);
+    EXPECT_EQ(packet.header.answers, 0);
+    EXPECT_EQ(packet.header.authoritative_entries, 0);
+    EXPECT_EQ(packet.header.resource_entries, 0);
+
+    EXPECT_TRUE(packet.questions.empty());
+    EXPECT_TRUE(packet.answers.empty());
+    EXPECT_TRUE(packet.authorities.empty());
+    EXPECT_TRUE(packet.resources.empty());
+
+    EXPECT_EQ(buffer.position(), end);
+}
+
+TEST(DnsPacketTest, DecodeSingleRootQuestion)
+{
+    PacketBuffer buffer{};
+    std::size_t pos = 0;
+    pos = write_header(buffer, pos, 0xBEEF, 0x0100, 1, 0, 0, 0);
+    const std::size_t end = write_question(buffer, pos, "", 1, 1);
+
+    DnsPacket packet{};
+    packet.decode_from_buffer(buffer);
+
+    ASSERT_EQ(packet.questions.size(), 1U);
+    EXPECT_TRUE(packet.answers.empty());
+    EXPECT_TRUE(packet.authorities.empty());
+    EXPECT_TRUE(packet.resources.empty());
+
+    EXPECT_EQ(packet.header.id, 0xBEEF);
+    EXPECT_FALSE(packet.header.response);
+    EXPECT_TRUE(packet.header.recursion_desired);
+    EXPECT_EQ(packet.header.questions, 1);
+
+    EXPECT_EQ(packet.questions[0].name, "");
+    EXPECT_EQ(packet.questions[0].qtype, QueryType::A);
+
+    EXPECT_EQ(buffer.position(), end);
+}
+
+TEST(DnsPacketTest, DecodeAllSectionsPreservesCountsOrderAndContents)
+{
+    PacketBuffer buffer{};
+    std::size_t pos = 0;
+
+    pos = write_header(buffer, pos, 0xCAFE, 0x8180, 2, 2, 1, 1);
+
+    pos = write_question(buffer, pos, "", 1, 1);
+    pos = write_question(buffer, pos, "", 28, 1);
+
+    pos = write_a_record(buffer, pos, "", 60U, {1, 2, 3, 4});
+    pos = write_unknown_record(buffer, pos, "", 65000U, 77U, {0xAA, 0xBB});
+
+    pos = write_unknown_record(buffer, pos, "", 99U, 3U, {});
+
+    const std::size_t end = write_a_record(buffer, pos, "", 120U, {8, 8, 8, 8});
+
+    DnsPacket packet{};
+    packet.decode_from_buffer(buffer);
+
+    EXPECT_EQ(packet.header.id, 0xCAFE);
+    EXPECT_EQ(packet.header.questions, 2);
+    EXPECT_EQ(packet.header.answers, 2);
+    EXPECT_EQ(packet.header.authoritative_entries, 1);
+    EXPECT_EQ(packet.header.resource_entries, 1);
+
+    ASSERT_EQ(packet.questions.size(), 2U);
+    EXPECT_EQ(packet.questions[0].name, "");
+    EXPECT_EQ(packet.questions[0].qtype, QueryType::A);
+    EXPECT_EQ(packet.questions[1].name, "");
+    EXPECT_EQ(packet.questions[1].qtype, QueryType::Unknown);
+
+    ASSERT_EQ(packet.answers.size(), 2U);
+    ASSERT_TRUE(std::holds_alternative<ARecord>(packet.answers[0]));
+    ASSERT_TRUE(std::holds_alternative<UnknownRecord>(packet.answers[1]));
+
+    const auto& answer_a = std::get<ARecord>(packet.answers[0]);
+    EXPECT_EQ(answer_a.domain, "");
+    EXPECT_EQ(answer_a.addr, (std::array<std::uint8_t, 4>{1, 2, 3, 4}));
+    EXPECT_EQ(answer_a.ttl, 60U);
+
+    const auto& answer_unknown = std::get<UnknownRecord>(packet.answers[1]);
+    EXPECT_EQ(answer_unknown.domain, "");
+    EXPECT_EQ(answer_unknown.qtype, 65000U);
+    EXPECT_EQ(answer_unknown.data_len, 2U);
+    EXPECT_EQ(answer_unknown.ttl, 77U);
+
+    ASSERT_EQ(packet.authorities.size(), 1U);
+    ASSERT_TRUE(std::holds_alternative<UnknownRecord>(packet.authorities[0]));
+    const auto& authority = std::get<UnknownRecord>(packet.authorities[0]);
+    EXPECT_EQ(authority.domain, "");
+    EXPECT_EQ(authority.qtype, 99U);
+    EXPECT_EQ(authority.data_len, 0U);
+    EXPECT_EQ(authority.ttl, 3U);
+
+    ASSERT_EQ(packet.resources.size(), 1U);
+    ASSERT_TRUE(std::holds_alternative<ARecord>(packet.resources[0]));
+    const auto& resource = std::get<ARecord>(packet.resources[0]);
+    EXPECT_EQ(resource.domain, "");
+    EXPECT_EQ(resource.addr, (std::array<std::uint8_t, 4>{8, 8, 8, 8}));
+    EXPECT_EQ(resource.ttl, 120U);
+
+    EXPECT_EQ(buffer.position(), end);
+}
+
+TEST(DnsPacketTest, DecodeClearsPreviousStateBeforeReadingNewPacket)
+{
+    DnsPacket packet{};
+    packet.header.id = 9999;
+    packet.questions.push_back(DnsQuestion{"stale", QueryType::A});
+    packet.answers.push_back(ARecord{.domain = "stale", .addr = {1, 1, 1, 1}, .ttl = 1});
+    packet.authorities.push_back(
+        UnknownRecord{.domain = "stale", .qtype = 15, .data_len = 2, .ttl = 10});
+    packet.resources.push_back(ARecord{.domain = "stale", .addr = {9, 9, 9, 9}, .ttl = 9});
+
+    PacketBuffer buffer{};
+    const std::size_t end = write_header(buffer, 0, 0x2222, 0x8180, 0, 0, 0, 0);
+
+    packet.decode_from_buffer(buffer);
+
+    EXPECT_EQ(packet.header.id, 0x2222);
+    EXPECT_TRUE(packet.questions.empty());
+    EXPECT_TRUE(packet.answers.empty());
+    EXPECT_TRUE(packet.authorities.empty());
+    EXPECT_TRUE(packet.resources.empty());
+    EXPECT_EQ(buffer.position(), end);
+}
+
+TEST(DnsPacketTest, DecodeWorksFromNonZeroBufferOffset)
+{
+    PacketBuffer buffer{};
+    constexpr std::size_t start = 100;
+
+    std::size_t pos = start;
+    pos = write_header(buffer, pos, 0x0A0B, 0x8180, 1, 1, 0, 0);
+    pos = write_question(buffer, pos, "", 1, 1);
+    const std::size_t end = write_a_record(buffer, pos, "", 444U, {4, 3, 2, 1});
+
+    buffer.seek(start);
+
+    DnsPacket packet{};
+    packet.decode_from_buffer(buffer);
+
+    EXPECT_EQ(packet.header.id, 0x0A0B);
+    ASSERT_EQ(packet.questions.size(), 1U);
+    ASSERT_EQ(packet.answers.size(), 1U);
+
+    EXPECT_EQ(packet.questions[0].name, "");
+    EXPECT_EQ(packet.questions[0].qtype, QueryType::A);
+
+    ASSERT_TRUE(std::holds_alternative<ARecord>(packet.answers[0]));
+    const auto& answer = std::get<ARecord>(packet.answers[0]);
+    EXPECT_EQ(answer.domain, "");
+    EXPECT_EQ(answer.addr, (std::array<std::uint8_t, 4>{4, 3, 2, 1}));
+    EXPECT_EQ(answer.ttl, 444U);
+
+    EXPECT_EQ(buffer.position(), end);
+}
+
+TEST(DnsPacketTest, TruncatedHeaderStillResetsPacketAndDoesNotLeaveStaleSections)
+{
+    DnsPacket packet{};
+    packet.questions.push_back(DnsQuestion{"old", QueryType::A});
+    packet.answers.push_back(ARecord{.domain = "old", .addr = {1, 1, 1, 1}, .ttl = 1});
+
+    PacketBuffer buffer{};
+    std::size_t pos = 0;
+    pos = write_u16(buffer, pos, 0xABCD);
+    pos = write_u16(buffer, pos, 0x8180);
+
+    packet.decode_from_buffer(buffer);
+
+    EXPECT_EQ(packet.header.id, 0xABCD);
+    EXPECT_TRUE(packet.questions.empty());
+    EXPECT_TRUE(packet.answers.empty());
+    EXPECT_TRUE(packet.authorities.empty());
+    EXPECT_TRUE(packet.resources.empty());
+
+    EXPECT_EQ(packet.header.questions, 0);
+    EXPECT_EQ(packet.header.answers, 0);
+    EXPECT_EQ(packet.header.authoritative_entries, 0);
+    EXPECT_EQ(packet.header.resource_entries, 0);
+
+    EXPECT_EQ(buffer.position(), pos);
+}
+
+/*
+ * This is an integration test for normal DNS names and compression.
+ * It is expected to pass once PacketBuffer::read_qname() is fully correct.
+ * If it fails right now, that usually means the lower-level qname parser
+ * still has one of the Rust-to-C++ translation bugs.
+ */
+TEST(DnsPacketTest, DecodeQuestionAndCompressedAnswerName)
+{
+    PacketBuffer buffer{};
+    std::size_t pos = 0;
+
+    pos = write_header(buffer, pos, 0x3333, 0x8180, 1, 1, 0, 0);
+
+    constexpr std::size_t question_name_offset = 12;
+    pos = write_question(buffer, pos, "example.com", 1, 1);
+    const std::size_t end =
+        write_compressed_a_record(buffer, pos, question_name_offset, 99U, {7, 7, 7, 7});
+
+    DnsPacket packet{};
+    packet.decode_from_buffer(buffer);
+
+    ASSERT_EQ(packet.questions.size(), 1U);
+    ASSERT_EQ(packet.answers.size(), 1U);
+
+    EXPECT_EQ(packet.questions[0].name, "example.com");
+    EXPECT_EQ(packet.questions[0].qtype, QueryType::A);
+
+    ASSERT_TRUE(std::holds_alternative<ARecord>(packet.answers[0]));
+    const auto& answer = std::get<ARecord>(packet.answers[0]);
+    EXPECT_EQ(answer.domain, "example.com");
+    EXPECT_EQ(answer.addr, (std::array<std::uint8_t, 4>{7, 7, 7, 7}));
+    EXPECT_EQ(answer.ttl, 99U);
+
+    EXPECT_EQ(buffer.position(), end);
+}

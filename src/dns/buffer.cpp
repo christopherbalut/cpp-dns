@@ -29,6 +29,7 @@ void PacketBuffer::step(std::size_t steps)
     {
         std::cout << "position out of bounds in step method of PacketBuffer\n";
         last_error_ = BufferError::position_out_of_bounds;
+        return;
     }
     position_ += steps;
     last_error_ = BufferError::none;
@@ -40,6 +41,7 @@ void PacketBuffer::seek(std::size_t position)
     {
         std::cout << "position out of bounds in seek method of PacketBuffer\n";
         last_error_ = BufferError::position_out_of_bounds;
+        return;
     }
     position_ = position;
     last_error_ = BufferError::none;
@@ -134,7 +136,7 @@ void PacketBuffer::read_qname(std::string& out)
             return;
         }
 
-        const std::uint8_t length{get(position_)};
+        const std::uint8_t length{get(pos)};
 
         if (length == 0)
         {
@@ -149,7 +151,7 @@ void PacketBuffer::read_qname(std::string& out)
                 std::cout << "read_qname() has too many compression jumps, exiting ...\n";
                 return;
             }
-            if (pos + 1 >= max_jump)
+            if (pos + 1 >= max_size)
             {
                 std::cout << "qname() has an incomplete compression pointer\n";
                 return;
