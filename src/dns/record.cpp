@@ -20,7 +20,19 @@ DnsRecord decode_record(PacketBuffer& buffer)
     {
         case QueryType::A:
         {
+            if (data_length < 4)
+            {
+                buffer.step(data_length);
+                return UnknownRecord{
+                    .domain = domain, .qtype = qtype_num, .data_len = data_length, .ttl = ttl};
+            }
+
             const std::uint32_t raw_addr{buffer.read_u32()};
+
+            if (data_length > 4)
+            {
+                buffer.step(static_cast<std::size_t>(data_length - 4));
+            }
 
             const std::array<std::uint8_t, 4> addr{
                 static_cast<std::uint8_t>((raw_addr >> 24) & 0xFF),

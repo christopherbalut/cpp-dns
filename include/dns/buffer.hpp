@@ -16,12 +16,6 @@ enum class BufferError : std::uint8_t
     position_out_of_bounds
 };
 
-struct ReadByteResult
-{
-    std::uint8_t value{};
-    BufferError error{BufferError::none};
-};
-
 class PacketBuffer
 {
   public:
@@ -50,4 +44,5 @@ class PacketBuffer
     std::size_t size_{0};
     BufferError last_error_{BufferError::none};
 };
-}; // namespace dns
+
+} // namespace dns

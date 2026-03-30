@@ -1,8 +1,12 @@
 #include "dns/buffer.hpp"
+
+#include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
-#include <unistd.h>
+#include <span>
+#include <string>
 
 namespace dns
 {
@@ -12,10 +16,15 @@ void PacketBuffer::set(std::size_t pos, std::uint8_t value)
 {
     if (pos >= max_size)
     {
+        last_error_ = BufferError::position_out_of_bounds;
         return;
     }
 
     buffer_[pos] = value;
+
+    size_ = std::max(pos + 1, size_);
+
+    last_error_ = BufferError::none;
 }
 
 std::size_t PacketBuffer::position() const
@@ -25,96 +34,112 @@ std::size_t PacketBuffer::position() const
 
 void PacketBuffer::step(std::size_t steps)
 {
-    if (steps > max_size - position_)
+    if (position_ > size_ || steps > (size_ - position_))
     {
         std::cout << "position out of bounds in step method of PacketBuffer\n";
         last_error_ = BufferError::position_out_of_bounds;
         return;
     }
+
     position_ += steps;
     last_error_ = BufferError::none;
 }
 
 void PacketBuffer::seek(std::size_t position)
 {
-    if (position > max_size)
+    if (position > size_)
     {
         std::cout << "position out of bounds in seek method of PacketBuffer\n";
         last_error_ = BufferError::position_out_of_bounds;
         return;
     }
+
     position_ = position;
     last_error_ = BufferError::none;
 }
 
 std::uint8_t PacketBuffer::read_single_byte()
 {
-    if (position_ >= max_size)
+    if (position_ >= size_)
     {
-        std::cout << "The position of the byte is greater than 512, exiting...\n";
+        std::cout << "read_single_byte(): reached end of valid buffer data\n";
+        last_error_ = BufferError::end_of_buffer;
         return 0;
     }
 
-    std::uint8_t current_byte = buffer_[position()];
+    const std::uint8_t current_byte = buffer_[position_];
     ++position_;
+    last_error_ = BufferError::none;
     return current_byte;
 }
 
 std::uint8_t PacketBuffer::get(std::size_t position) const
 {
+    if (position >= size_)
+    {
+        return 0;
+    }
+
     return buffer_[position];
 }
 
 std::span<const std::uint8_t> PacketBuffer::get_range(std::size_t start, std::size_t length) const
 {
-    if (start > max_size)
+    if (start > size_)
     {
         return {};
     }
 
-    if (length + start > max_size)
+    if (length > (size_ - start))
     {
         return {};
     }
 
-    std::span<const std::uint8_t> full_view{buffer_};
+    std::span<const std::uint8_t> full_view{buffer_.data(), size_};
     return full_view.subspan(start, length);
 }
 
 std::uint16_t PacketBuffer::read_u16()
 {
-    if (position_ > max_size || 2 > (max_size - position_))
+    if (position_ > size_ || 2 > (size_ - position_))
     {
         last_error_ = BufferError::end_of_buffer;
         return 0;
     }
 
+    const auto first_byte = static_cast<std::uint16_t>(read_single_byte());
+    const auto second_byte = static_cast<std::uint16_t>(read_single_byte());
+
+    if (last_error_ != BufferError::none)
+    {
+        return 0;
+    }
+
     last_error_ = BufferError::none;
-
-    const auto first_byte =
-        static_cast<std::uint16_t>(read_single_byte()); // read first byte as the upper byte
-    const auto second_byte =
-        static_cast<std::uint16_t>(read_single_byte()); // read second as the lower byte
-
-    return static_cast<std::uint16_t>((first_byte << 8 | second_byte));
+    return static_cast<std::uint16_t>((first_byte << 8) | second_byte);
 }
+
 std::uint32_t PacketBuffer::read_u32()
 {
-    if (position_ > max_size || 4 > (max_size - position_))
+    if (position_ > size_ || 4 > (size_ - position_))
     {
         last_error_ = BufferError::end_of_buffer;
         return 0;
     }
-
-    last_error_ = BufferError::none;
 
     const auto first_byte = static_cast<std::uint32_t>(read_single_byte());
     const auto second_byte = static_cast<std::uint32_t>(read_single_byte());
     const auto third_byte = static_cast<std::uint32_t>(read_single_byte());
     const auto fourth_byte = static_cast<std::uint32_t>(read_single_byte());
 
-    return static_cast<std::uint32_t>(
-        ((first_byte << 24) | (second_byte << 16) | (third_byte << 8) | fourth_byte));
+    if (last_error_ != BufferError::none)
+    {
+        return 0;
+    }
+
+    last_error_ = BufferError::none;
+    return static_cast<std::uint32_t>((first_byte << 24) | (second_byte << 16) | (third_byte << 8) |
+                                      fourth_byte);
 }
 
 void PacketBuffer::read_qname(std::string& out)
@@ -123,16 +148,17 @@ void PacketBuffer::read_qname(std::string& out)
 
     std::size_t pos{position_};
     bool jumped{false};
-    constexpr std::size_t max_jump{5};
-    std::size_t jumps_performed{};
+    constexpr std::size_t max_jumps{5};
+    std::size_t jumps_performed{0};
 
     std::string delimiter;
 
     while (true)
     {
-        if (jumps_performed > max_jump)
+        if (pos >= size_)
         {
             std::cout << "read_qname(): position out of bounds\n";
+            last_error_ = BufferError::end_of_buffer;
             return;
         }
 
@@ -146,23 +172,38 @@ void PacketBuffer::read_qname(std::string& out)
 
         if ((length & 0xC0) == 0xC0)
         {
-            if (jumps_performed >= max_jump) // jump protection
+            if (jumps_performed >= max_jumps)
             {
-                std::cout << "read_qname() has too many compression jumps, exiting ...\n";
+                std::cout << "read_qname(): too many compression jumps\n";
+                last_error_ = BufferError::position_out_of_bounds;
                 return;
             }
-            if (pos + 1 >= max_size)
+
+            if (pos + 1 >= size_)
             {
-                std::cout << "qname() has an incomplete compression pointer\n";
+                std::cout << "read_qname(): incomplete compression pointer\n";
+                last_error_ = BufferError::end_of_buffer;
                 return;
             }
+
             const std::uint8_t second_byte{get(pos + 1)};
-            const std::uint16_t offset{
-                static_cast<std::uint16_t>(((length ^ 0xC0) << 8) | second_byte)};
+            const std::uint16_t offset = static_cast<std::uint16_t>(
+                ((static_cast<std::uint16_t>(length) & 0x3FU) << 8) | second_byte);
+
+            if (offset >= size_)
+            {
+                std::cout << "read_qname(): compression pointer out of bounds\n";
+                last_error_ = BufferError::position_out_of_bounds;
+                return;
+            }
 
             if (!jumped)
             {
                 seek(pos + 2);
+                if (last_error_ != BufferError::none)
+                {
+                    return;
+                }
             }
 
             pos = offset;
@@ -173,9 +214,10 @@ void PacketBuffer::read_qname(std::string& out)
 
         ++pos;
 
-        if (pos + length > max_size)
+        if (pos + length > size_)
         {
-            std::cout << "read_qname(): label extends past end of buffer\n";
+            std::cout << "read_qname(): label extends past end of valid buffer data\n";
+            last_error_ = BufferError::end_of_buffer;
             return;
         }
 
@@ -186,6 +228,7 @@ void PacketBuffer::read_qname(std::string& out)
         {
             out += static_cast<char>(std::tolower(static_cast<unsigned char>(byte)));
         }
+
         delimiter = ".";
         pos += length;
     }
@@ -193,7 +236,12 @@ void PacketBuffer::read_qname(std::string& out)
     if (!jumped)
     {
         seek(pos);
+        if (last_error_ != BufferError::none)
+        {
+            return;
+        }
     }
-    std::cout << out << "\n";
+
+    last_error_ = BufferError::none;
 }
-}; // namespace dns
+} // namespace dns
