@@ -17,10 +17,30 @@ void load_file_into_packet_buffer(const std::string& path, dns::PacketBuffer& bu
     std::ifstream input(path, std::ios::binary); // open file and read raw bytes
     if (!input)
     {
-        std::runtime_error("Runtime Error, failed to open file " + path + ", exiting...\n");
+        throw std::runtime_error("Runtime Error, failed to open file " + path + ", exiting...\n");
     }
 
     std::array<char, dns::PacketBuffer::max_size> bytes{}; // array of char
+    input.read(bytes.data(), static_cast<std::streamsize>(
+                                 bytes.size())); // read up to bytes.size() number of bytes in file
+    const std::streamsize count{input.gcount()}; // store the actual number of bytes used
+
+    if (count <= 0)
+    {
+        throw std::runtime_error("Runtime Error, path file is empty: " + path);
+    }
+
+    if (input.bad())
+    {
+        throw std::runtime_error("Runtime Error, failed while reading file: " + path);
+    }
+
+    for (std::size_t i{}; i < static_cast<std::size_t>(count); ++i)
+    {
+        buffer.set(i, static_cast<std::uint8_t>(bytes[i])); // copy one byte into temp file
+    }
+
+    buffer.seek(0); // reset PacketBuffer to restart decoding
 }
 
 int main()
