@@ -23,7 +23,11 @@ Implemented so far:
 - `docs/` — project notes and parsing documentation
 - `apps/` — small executable entry points
 
-## Build
+## Running the project
+
+This project uses helper scripts.
+
+Configure the build:
 
 ```bash
-./scripts/cbr.sh && ./scripts/configure.sh && .scripts/test.sh
+./scripts/configure.sh
