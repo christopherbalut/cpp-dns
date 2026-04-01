@@ -125,23 +125,23 @@ void print_packet(const dns::DnsPacket& packet)
 
 int main()
 {
+    // create empty packetbuffer
+    // open the file
+    // read the file into temporary storage
+    //
+    // for each byte read from the file:
+    // write that byte into packetbuffer using set(index, byte)
+    //
+    // reset packetbuffer cursor to begining
+    // create Empty DnsPacket
+    // decode the packet from packetbuffer
+    // print the header
+    // print each question
+    // print each answer
+    // print each authoriy asnwer
+    // print each resource used
     try
     {
-        // create empty packetbuffer
-        // open the file
-        // read the file into temporary storage
-        //
-        // for each byte read from the file:
-        // write that byte into packetbuffer using set(index, byte)
-        //
-        // reset packetbuffer cursor to begining
-        // create Empty DnsPacket
-        // decode the packet from packetbuffer
-        // print the header
-        // print each question
-        // print each answer
-        // print each authoriy asnwer
-        // print each resource used
         dns::PacketBuffer buffer{};
         load_file_into_packet_buffer("response_packet.txt", buffer);
 

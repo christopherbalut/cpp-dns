@@ -14,5 +14,5 @@ This stage is intentionally limited. The parser currently supports only a small 
 
 The next step is to build on top of this parsing layer and begin working with real DNS communication rather than only offline packet decoding.
 
-The resources used for this were:
+The resources used for this were: the RFC 1035 and the RFC 1034 Manuals
 
