@@ -23,6 +23,7 @@
 *.gcno
 *.gcda
 *.gcov
+*.cache/
 
 # Test and CTest artifacts
 /Testing/

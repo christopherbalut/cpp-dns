@@ -7,6 +7,7 @@
 #include <iostream>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace dns
 {
@@ -244,4 +245,102 @@ void PacketBuffer::read_qname(std::string& out)
 
     last_error_ = BufferError::none;
 }
+
+namespace
+{
+constexpr std::size_t dns_max_label_length = 63;
+constexpr std::size_t dns_max_name_wire_length = 255;
+} // namespace
+
+[[nodiscard]] bool PacketBuffer::can_write(std::size_t byte_count) const
+{
+    return position_ <= max_size && byte_count <= (max_size - position_);
+}
+
+void PacketBuffer::update_size_after_write()
+{
+    size_ = std::max(size_, position_);
+}
+
+bool PacketBuffer::ok() const
+{
+    return last_error_ == BufferError::none;
+}
+
+BufferError PacketBuffer::last_error() const
+{
+    return last_error_;
+}
+
+void PacketBuffer::clear_error()
+{
+    last_error_ = BufferError::none;
+}
+
+void PacketBuffer::write(std::uint8_t value)
+{
+    if (!can_write(1))
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    buffer_[position_] = value;
+    ++position_;
+    update_size_after_write();
+    last_error_ = BufferError::none;
+}
+
+void PacketBuffer::write_u8(std::uint8_t value)
+{
+    write(value);
+}
+
+void PacketBuffer::write_u16(std::uint16_t value)
+{
+    if (!can_write(2))
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    buffer_[position_] = static_cast<std::uint8_t>((value >> 8) & 0xFF);
+    position_++;
+
+    buffer_[position_] = static_cast<std::uint8_t>(value & 0xFF);
+    position_++;
+
+    update_size_after_write();
+    last_error_ = BufferError::none;
+}
+
+void PacketBuffer::write_u32(std::uint32_t value)
+{
+    if (!can_write(4))
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    buffer_[position_] = static_cast<std::uint8_t>((value >> 24) & 0xFF);
+    position_++;
+
+    buffer_[position_] = static_cast<std::uint8_t>((value >> 16) & 0xFF);
+    position_++;
+
+    buffer_[position_] = static_cast<std::uint8_t>((value >> 8) & 0xFF);
+    position_++;
+
+    buffer_[position_] = static_cast<std::uint8_t>(value & 0xFF);
+    position_++;
+
+    update_size_after_write();
+    last_error_ = BufferError::none;
+}
+
+void PacketBuffer::read_qname(std::string_view qname)
+{
+    return;
+}
+
 } // namespace dns
