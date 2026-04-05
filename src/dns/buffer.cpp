@@ -188,7 +188,7 @@ void PacketBuffer::read_qname(std::string& out)
             }
 
             const std::uint8_t second_byte{get(pos + 1)};
-            const std::uint16_t offset = static_cast<std::uint16_t>(
+            const auto offset = static_cast<std::uint16_t>(
                 ((static_cast<std::uint16_t>(length) & 0x3FU) << 8) | second_byte);
 
             if (offset >= size_)
@@ -338,9 +338,94 @@ void PacketBuffer::write_u32(std::uint32_t value)
     last_error_ = BufferError::none;
 }
 
-void PacketBuffer::read_qname(std::string_view qname)
+void PacketBuffer::write_qname(std::string_view qname)
 {
-    return;
+    // check if we can write
+    if (qname.empty() || qname == ".")
+    {
+        write_u8(0);
+        return;
+    }
+    // trailing dot is ok
+    if (!qname.empty() && qname.back() == '.')
+    {
+        qname.remove_suffix(1);
+        return;
+    }
+    // check if empty
+    if (qname.empty())
+    {
+        write_u8(0);
+        return;
+    }
+    // validate and compute encoded size
+    std::size_t encoded_size{0};
+    std::size_t current_label_length{1};
+
+    for (char ch : qname)
+    {
+        if (ch == '.') // we hit a dot, we reset everything now
+        {
+            if (current_label_length == 0) // edge case
+            {
+                last_error_ = BufferError::invalid_qname;
+                return;
+            }
+
+            encoded_size += 1 + current_label_length; // not edge case
+            current_label_length = 0;
+            continue;
+        }
+
+        ++current_label_length; // increase cur len until we hit a dot or we surpass the max length
+        if (current_label_length > dns_max_label_length)
+        {
+            last_error_ = BufferError::label_too_long;
+            return;
+        }
+    }
+    // check capcity
+    if (current_label_length == 0) // check whether the last label used was empty
+    {
+        last_error_ = BufferError::invalid_qname; // ended in invalid way
+        return;
+    }
+    encoded_size += 1 + current_label_length;    // add final label position
+    if (encoded_size > dns_max_name_wire_length) // we stop if the size is too large
+    {
+        last_error_ = BufferError::qname_too_long;
+        return;
+    }
+    // encode and write
+    if (!can_write(encoded_size))
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    std::size_t label_start{};
+    for (std::size_t i{}; i <= qname.size(); ++i)
+    {
+        const bool at_end = (i == qname.size());
+        const bool at_dot = (!at_end && qname[i] == '.');
+        if (!at_end && !at_dot)
+        {
+            continue;
+        }
+        const std::size_t label_length = i - label_start;
+        buffer_[position_] = static_cast<std::uint8_t>(label_length);
+        position_++;
+        for (std::size_t j = label_start; j < i; ++j)
+        {
+            buffer_[position_] = static_cast<std::uint8_t>(static_cast<unsigned char>(qname[j]));
+            position_++;
+        }
+        label_start = i + 1;
+    }
+    buffer_[position_] = 0;
+    position_++;
+    update_size_after_write();
+    last_error_ = BufferError::none;
 }
 
 } // namespace dns

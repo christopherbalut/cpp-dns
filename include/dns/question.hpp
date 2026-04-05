@@ -17,6 +17,8 @@ struct DnsQuestion
     DnsQuestion(std::string question_name, QueryType question_type);
 
     void decode(PacketBuffer& buffer);
+
+    void write(PacketBuffer& buffer) const;
 };
 
 } // namespace dns
