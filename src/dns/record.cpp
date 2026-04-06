@@ -3,6 +3,8 @@
 #include "dns/question.hpp"
 #include "dns/types.hpp"
 #include <array>
+#include <iostream>
+#include <variant>
 
 namespace dns
 {
@@ -52,5 +54,32 @@ DnsRecord decode_record(PacketBuffer& buffer)
                 .domain = domain, .qtype = qtype_num, .data_len = data_length, .ttl = ttl};
         }
     }
+}
+
+std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
+{
+    auto start_position{buffer.position()};
+
+    std::visit(
+        [&](const auto& rec)
+        {
+            using T = std::decay_t<decltype(rec)>;
+
+            if constexpr (std::is_same_v<T, ARecord>)
+            {
+                buffer.write_qname(rec.domain);
+                buffer.write_u16(1);
+                buffer.write_u16(1);
+                buffer.write_u32(rec.ttl);
+                buffer.write_u16(4);
+            }
+            else if constexpr (std::is_same_v<T, UnknownRecord>)
+            {
+                std::cout << "skip for now \n";
+            }
+        },
+        record);
+
+    return buffer.position() - start_position;
 }
 }; // namespace dns

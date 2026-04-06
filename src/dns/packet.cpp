@@ -1,4 +1,5 @@
 #include "dns/packet.hpp"
+#include "dns/buffer.hpp"
 #include "dns/header.hpp"
 #include "dns/record.hpp"
 
@@ -45,6 +46,40 @@ void DnsPacket::decode_from_buffer(PacketBuffer& buffer)
     for (std::size_t i{0}; i < resource_count; ++i)
     {
         resources.emplace_back(decode_record(buffer));
+    }
+}
+
+void DnsPacket::write_from_buffer(PacketBuffer& buffer)
+{
+    // Update header count to match the current entries
+    header.questions = static_cast<std::uint16_t>(questions.size());
+    header.answers = static_cast<std::uint16_t>(answers.size());
+    header.authoritative_entries = static_cast<std::uint16_t>(authorities.size());
+    header.resource_entries = static_cast<std::uint16_t>(resources.size());
+
+    header.write(buffer); // write 12 byte header first
+
+    for (const DnsQuestion& question : questions) // write every question
+    {
+        question.write(buffer);
+    }
+
+    for (const DnsRecord& record : answers) // write every answer
+    {
+        static_cast<void>(
+            write_record(record, buffer)); // we don't need return value, so we cast to void
+    }
+
+    for (const DnsRecord& record :
+         authorities) // write every authority record in authoriryt section
+    {
+        static_cast<void>(write_record(record, buffer));
+    }
+
+    for (const DnsRecord& record :
+         resources) // write every additional resource record in additional section
+    {
+        static_cast<void>(write_record(record, buffer));
     }
 }
 }; // namespace dns

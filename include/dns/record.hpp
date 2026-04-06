@@ -2,6 +2,7 @@
 
 #include "dns/buffer.hpp"
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -34,4 +35,7 @@ using DnsRecord = std::variant<UnknownRecord, ARecord>;
 
 DnsRecord decode_record(PacketBuffer& buffer);
 
+std::size_t write_record(
+    const DnsRecord& record,
+    PacketBuffer& buffer); // take as input an in-memory DNS record, serialize it and write it
 } // namespace dns
