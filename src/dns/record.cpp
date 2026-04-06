@@ -72,6 +72,11 @@ std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
                 buffer.write_u16(1);
                 buffer.write_u32(rec.ttl);
                 buffer.write_u16(4);
+
+                buffer.write_u8(rec.addr[0]);
+                buffer.write_u8(rec.addr[1]);
+                buffer.write_u8(rec.addr[2]);
+                buffer.write_u8(rec.addr[3]);
             }
             else if constexpr (std::is_same_v<T, UnknownRecord>)
             {
