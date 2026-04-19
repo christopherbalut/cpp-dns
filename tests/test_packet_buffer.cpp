@@ -6,6 +6,9 @@
 
 #include "dns/buffer.hpp"
 
+using dns::BufferError;
+using dns::PacketBuffer;
+
 namespace
 {
 
@@ -419,4 +422,280 @@ TEST(PacketBufferTest, SetCanCreateSparseValidPrefix)
     EXPECT_EQ(buffer.position(), 5u);
 }
 
+constexpr std::size_t packet_buffer_capacity = 512;
+
+std::uint8_t u8(char ch)
+{
+    return static_cast<std::uint8_t>(static_cast<unsigned char>(ch));
+}
+
+void fill_buffer(PacketBuffer& buffer, std::size_t count, std::uint8_t value = 0xEE)
+{
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        buffer.write(value);
+        ASSERT_EQ(buffer.last_error(), BufferError::none);
+    }
+}
+
+void expect_bytes_at(PacketBuffer& buffer, std::size_t offset,
+                     std::initializer_list<std::uint8_t> expected)
+{
+    std::size_t i = 0;
+    for (std::uint8_t byte : expected)
+    {
+        EXPECT_EQ(buffer.get(offset + i), byte) << "Mismatch at byte " << (offset + i);
+        ++i;
+    }
+}
+
+std::string repeated_label_domain(std::size_t label_count)
+{
+    std::string out;
+    for (std::size_t i = 0; i < label_count; ++i)
+    {
+        if (i > 0)
+        {
+            out.push_back('.');
+        }
+        out.push_back('a');
+    }
+    return out;
+}
+
 } // namespace
+
+TEST(PacketBufferWriteTests, WriteStoresByteAndAdvancesPosition)
+{
+    PacketBuffer buffer{};
+
+    buffer.write(0xAB);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), 1u);
+    EXPECT_EQ(buffer.get(0), 0xAB);
+}
+
+TEST(PacketBufferWriteTests, WriteFailsAtEndOfBuffer)
+{
+    PacketBuffer buffer{};
+    fill_buffer(buffer, packet_buffer_capacity);
+
+    const std::size_t before = buffer.position();
+
+    buffer.write(0xCD);
+
+    EXPECT_FALSE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::end_of_buffer);
+    EXPECT_EQ(buffer.position(), before);
+}
+
+TEST(PacketBufferWriteTests, WriteU8MatchesWrite)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_u8(0x7F);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 1u);
+    EXPECT_EQ(buffer.get(0), 0x7F);
+}
+
+TEST(PacketBufferWriteTests, WriteU16WritesBigEndian)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_u16(0xABCD);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), 2u);
+    expect_bytes_at(buffer, 0, {0xAB, 0xCD});
+}
+
+TEST(PacketBufferWriteTests, WriteU16FailsCleanlyWhenOnlyOneByteRemains)
+{
+    PacketBuffer buffer{};
+    fill_buffer(buffer, packet_buffer_capacity - 1);
+
+    const std::size_t before = buffer.position();
+
+    buffer.write_u16(0x1234);
+
+    EXPECT_FALSE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::end_of_buffer);
+    EXPECT_EQ(buffer.position(), before);
+}
+
+TEST(PacketBufferWriteTests, WriteU32WritesBigEndian)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_u32(0x1234ABCD);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), 4u);
+    expect_bytes_at(buffer, 0, {0x12, 0x34, 0xAB, 0xCD});
+}
+
+TEST(PacketBufferWriteTests, WriteU32FailsCleanlyWhenNotEnoughSpaceRemains)
+{
+    PacketBuffer buffer{};
+    fill_buffer(buffer, packet_buffer_capacity - 3);
+
+    const std::size_t before = buffer.position();
+
+    buffer.write_u32(0x12345678);
+
+    EXPECT_FALSE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::end_of_buffer);
+    EXPECT_EQ(buffer.position(), before);
+}
+
+TEST(PacketBufferQNameTests, WriteQNameEmptyStringWritesRootLabel)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_qname("");
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), 1u);
+    expect_bytes_at(buffer, 0, {0x00});
+}
+
+TEST(PacketBufferQNameTests, WriteQNameSingleDotWritesRootLabel)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_qname(".");
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), 1u);
+    expect_bytes_at(buffer, 0, {0x00});
+}
+
+TEST(PacketBufferQNameTests, WriteQNameSingleLabelEncodesCorrectly)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_qname("localhost");
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), 11u);
+    expect_bytes_at(
+        buffer, 0,
+        {9, u8('l'), u8('o'), u8('c'), u8('a'), u8('l'), u8('h'), u8('o'), u8('s'), u8('t'), 0});
+}
+
+TEST(PacketBufferQNameTests, WriteQNameMultiLabelEncodesCorrectly)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_qname("www.example.com");
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), 17u);
+    expect_bytes_at(buffer, 0,
+                    {3, u8('w'), u8('w'), u8('w'), 7, u8('e'), u8('x'), u8('a'), u8('m'), u8('p'),
+                     u8('l'), u8('e'), 3, u8('c'), u8('o'), u8('m'), 0});
+}
+
+TEST(PacketBufferQNameTests, WriteQNameRejectsDoubleDot)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_qname("a..b");
+
+    EXPECT_FALSE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::invalid_qname);
+    EXPECT_EQ(buffer.position(), 0u);
+}
+
+TEST(PacketBufferQNameTests, WriteQNameRejectsLeadingDot)
+{
+    PacketBuffer buffer{};
+
+    buffer.write_qname(".abc");
+
+    EXPECT_FALSE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::invalid_qname);
+    EXPECT_EQ(buffer.position(), 0u);
+}
+
+TEST(PacketBufferQNameTests, WriteQNameTrailingDotShouldEncodeSameAsWithoutTrailingDot)
+{
+    PacketBuffer a{};
+    PacketBuffer b{};
+
+    a.write_qname("example.com");
+    b.write_qname("example.com.");
+
+    ASSERT_EQ(a.last_error(), BufferError::none);
+    ASSERT_EQ(b.last_error(), BufferError::none);
+
+    EXPECT_EQ(b.position(), a.position());
+
+    for (std::size_t i = 0; i < a.position(); ++i)
+    {
+        EXPECT_EQ(b.get(i), a.get(i)) << "Mismatch at byte " << i;
+    }
+}
+
+TEST(PacketBufferQNameTests, WriteQNameAcceptsLabelOfLengthSixtyThree)
+{
+    PacketBuffer buffer{};
+    const std::string label(63, 'a');
+
+    buffer.write_qname(label);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), 65u);
+    EXPECT_EQ(buffer.get(0), 63);
+    EXPECT_EQ(buffer.get(64), 0);
+}
+
+TEST(PacketBufferQNameTests, WriteQNameRejectsLabelLongerThanSixtyThree)
+{
+    PacketBuffer buffer{};
+    const std::string label(64, 'a');
+
+    buffer.write_qname(label);
+
+    EXPECT_FALSE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::label_too_long);
+    EXPECT_EQ(buffer.position(), 0u);
+}
+
+TEST(PacketBufferQNameTests, WriteQNameRejectsNamesWhoseWireFormatExceedsTwoHundredFiftyFiveBytes)
+{
+    PacketBuffer buffer{};
+    const std::string domain = repeated_label_domain(128); // 128 one-char labels => wire length 257
+
+    buffer.write_qname(domain);
+
+    EXPECT_FALSE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::qname_too_long);
+    EXPECT_EQ(buffer.position(), 0u);
+}
+
+TEST(PacketBufferQNameTests, WriteQNameSucceedsWhenRemainingSpaceExactlyMatchesActualEncodedLength)
+{
+    PacketBuffer buffer{};
+
+    // "a.b" encodes to: 1 'a' 1 'b' 0  => 5 bytes total
+    fill_buffer(buffer, packet_buffer_capacity - 5);
+
+    buffer.write_qname("a.b");
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), BufferError::none);
+    EXPECT_EQ(buffer.position(), packet_buffer_capacity);
+    expect_bytes_at(buffer, packet_buffer_capacity - 5, {1, u8('a'), 1, u8('b'), 0});
+}

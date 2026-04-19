@@ -350,17 +350,15 @@ void PacketBuffer::write_qname(std::string_view qname)
     if (!qname.empty() && qname.back() == '.')
     {
         qname.remove_suffix(1);
-        return;
     }
     // check if empty
     if (qname.empty())
     {
         write_u8(0);
-        return;
     }
     // validate and compute encoded size
     std::size_t encoded_size{0};
-    std::size_t current_label_length{1};
+    std::size_t current_label_length{0};
 
     for (char ch : qname)
     {

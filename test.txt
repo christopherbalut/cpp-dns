@@ -1,0 +1,407 @@
+[ 35%] Built target cpp_dns
+[ 47%] Built target cpp_dns_app
+[100%] Built target dns_tests
+Test project /home/lilman/Documents/personal/cpp-dns/build
+      Start  1: DnsHeaderTest.DefaultConstructionMatchesRustNewFunction
+ 1/98 Test  #1: DnsHeaderTest.DefaultConstructionMatchesRustNewFunction ........................................   Passed    0.00 sec
+      Start  2: DnsHeaderTest.DecodeZeroHeaderProducesAllZeroAndFalseFields
+ 2/98 Test  #2: DnsHeaderTest.DecodeZeroHeaderProducesAllZeroAndFalseFields ....................................   Passed    0.00 sec
+      Start  3: DnsHeaderTest.DecodeReadsIdAndCountFieldsInNetworkByteOrder
+ 3/98 Test  #3: DnsHeaderTest.DecodeReadsIdAndCountFieldsInNetworkByteOrder ....................................   Passed    0.00 sec
+      Start  4: DnsHeaderTest.DecodeWorksFromNonZeroBufferOffset
+ 4/98 Test  #4: DnsHeaderTest.DecodeWorksFromNonZeroBufferOffset ...............................................   Passed    0.00 sec
+      Start  5: DnsHeaderTest.DecodeFullyPopulatedRepresentativeHeader
+ 5/98 Test  #5: DnsHeaderTest.DecodeFullyPopulatedRepresentativeHeader .........................................   Passed    0.00 sec
+      Start  6: DnsHeaderTest.DecodeExhaustivelyChecksAll65536PossibleFlagWords
+ 6/98 Test  #6: DnsHeaderTest.DecodeExhaustivelyChecksAll65536PossibleFlagWords ................................   Passed    0.12 sec
+      Start  7: DnsPacketTest.DecodeEmptyPacketParsesHeaderAndLeavesAllSectionsEmpty
+ 7/98 Test  #7: DnsPacketTest.DecodeEmptyPacketParsesHeaderAndLeavesAllSectionsEmpty ...........................   Passed    0.00 sec
+      Start  8: DnsPacketTest.DecodeSingleRootQuestion
+ 8/98 Test  #8: DnsPacketTest.DecodeSingleRootQuestion .........................................................   Passed    0.00 sec
+      Start  9: DnsPacketTest.DecodeAllSectionsPreservesCountsOrderAndContents
+ 9/98 Test  #9: DnsPacketTest.DecodeAllSectionsPreservesCountsOrderAndContents .................................   Passed    0.00 sec
+      Start 10: DnsPacketTest.DecodeClearsPreviousStateBeforeReadingNewPacket
+10/98 Test #10: DnsPacketTest.DecodeClearsPreviousStateBeforeReadingNewPacket ..................................   Passed    0.00 sec
+      Start 11: DnsPacketTest.DecodeWorksFromNonZeroBufferOffset
+11/98 Test #11: DnsPacketTest.DecodeWorksFromNonZeroBufferOffset ...............................................   Passed    0.00 sec
+      Start 12: DnsPacketTest.TruncatedHeaderStillResetsPacketAndDoesNotLeaveStaleSections
+12/98 Test #12: DnsPacketTest.TruncatedHeaderStillResetsPacketAndDoesNotLeaveStaleSections .....................   Passed    0.00 sec
+      Start 13: DnsPacketTest.DecodeQuestionAndCompressedAnswerName
+13/98 Test #13: DnsPacketTest.DecodeQuestionAndCompressedAnswerName ............................................   Passed    0.00 sec
+      Start 14: DnsQuestionTest.DefaultConstructorStartsEmptyAndUnknown
+14/98 Test #14: DnsQuestionTest.DefaultConstructorStartsEmptyAndUnknown ........................................   Passed    0.00 sec
+      Start 15: DnsQuestionTest.ValueConstructorStoresProvidedValues
+15/98 Test #15: DnsQuestionTest.ValueConstructorStoresProvidedValues ...........................................   Passed    0.00 sec
+      Start 16: DnsQuestionTest.DecodeReadsRootDomainQuestion
+16/98 Test #16: DnsQuestionTest.DecodeReadsRootDomainQuestion ..................................................   Passed    0.00 sec
+      Start 17: DnsQuestionTest.DecodeReadsUncompressedQuestionAtBufferStart
+17/98 Test #17: DnsQuestionTest.DecodeReadsUncompressedQuestionAtBufferStart ...................................   Passed    0.00 sec
+      Start 18: DnsQuestionTest.DecodeLowercasesQNameAndConsumesClassField
+18/98 Test #18: DnsQuestionTest.DecodeLowercasesQNameAndConsumesClassField .....................................   Passed    0.00 sec
+      Start 19: DnsQuestionTest.DecodeWorksFromNonZeroOffset
+19/98 Test #19: DnsQuestionTest.DecodeWorksFromNonZeroOffset ...................................................   Passed    0.00 sec
+      Start 20: DnsQuestionTest.DecodeMapsUnknownNumericTypeToUnknown
+20/98 Test #20: DnsQuestionTest.DecodeMapsUnknownNumericTypeToUnknown ..........................................   Passed    0.00 sec
+      Start 21: DnsQuestionTest.DecodeReadsCompressedQuestionName
+21/98 Test #21: DnsQuestionTest.DecodeReadsCompressedQuestionName ..............................................   Passed    0.00 sec
+      Start 22: DnsQuestionTest.DecodeWithMissingTypeLeavesTypeUnknownAndDoesNotAdvancePastQName
+22/98 Test #22: DnsQuestionTest.DecodeWithMissingTypeLeavesTypeUnknownAndDoesNotAdvancePastQName ...............   Passed    0.00 sec
+      Start 23: DnsQuestionTest.DecodeWithMissingClassStillKeepsDecodedType
+23/98 Test #23: DnsQuestionTest.DecodeWithMissingClassStillKeepsDecodedType ....................................   Passed    0.00 sec
+      Start 24: DnsQuestionTest.DecodeIgnoresQuestionClassButStillConsumesIt
+24/98 Test #24: DnsQuestionTest.DecodeIgnoresQuestionClassButStillConsumesIt ...................................   Passed    0.00 sec
+      Start 25: DnsRecordTest.DecodeARecordSingleLabel
+25/98 Test #25: DnsRecordTest.DecodeARecordSingleLabel .........................................................   Passed    0.00 sec
+      Start 26: DnsRecordTest.DecodeRootARecord
+26/98 Test #26: DnsRecordTest.DecodeRootARecord ................................................................   Passed    0.00 sec
+      Start 27: DnsRecordTest.DecodeUnknownRecordPreservesMetadataAndSkipsPayload
+27/98 Test #27: DnsRecordTest.DecodeUnknownRecordPreservesMetadataAndSkipsPayload ..............................   Passed    0.00 sec
+      Start 28: DnsRecordTest.DecodeUnknownRecordWithZeroLengthRdata
+28/98 Test #28: DnsRecordTest.DecodeUnknownRecordWithZeroLengthRdata ...........................................   Passed    0.00 sec
+      Start 29: DnsRecordTest.DecodeRecordFromNonZeroOffset
+29/98 Test #29: DnsRecordTest.DecodeRecordFromNonZeroOffset ....................................................   Passed    0.00 sec
+      Start 30: DnsRecordTest.TruncatedRecordAfterQNameDoesNotAdvancePastAvailableData
+30/98 Test #30: DnsRecordTest.TruncatedRecordAfterQNameDoesNotAdvancePastAvailableData .........................   Passed    0.00 sec
+      Start 31: DnsRecordTest.DecodeMultiLabelARecordAndLowercaseDomain
+31/98 Test #31: DnsRecordTest.DecodeMultiLabelARecordAndLowercaseDomain ........................................   Passed    0.00 sec
+      Start 32: DnsRecordTest.DecodeCompressedNameARecord
+32/98 Test #32: DnsRecordTest.DecodeCompressedNameARecord ......................................................   Passed    0.00 sec
+      Start 33: DnsRecordTest.ARecordShouldConsumeEntireRecordWhenDeclaredLengthIsFive
+33/98 Test #33: DnsRecordTest.ARecordShouldConsumeEntireRecordWhenDeclaredLengthIsFive .........................   Passed    0.00 sec
+      Start 34: DnsRecordTest.UnknownRecordShouldNeverMovePastEndOfBuffer
+34/98 Test #34: DnsRecordTest.UnknownRecordShouldNeverMovePastEndOfBuffer ......................................   Passed    0.00 sec
+      Start 35: PacketBufferTest.StartsAtPositionZero
+35/98 Test #35: PacketBufferTest.StartsAtPositionZero ..........................................................   Passed    0.00 sec
+      Start 36: PacketBufferTest.StepByZeroKeepsPositionUnchangedOnEmptyBuffer
+36/98 Test #36: PacketBufferTest.StepByZeroKeepsPositionUnchangedOnEmptyBuffer .................................   Passed    0.00 sec
+      Start 37: PacketBufferTest.StepPastValidDataDoesNotAdvancePosition
+37/98 Test #37: PacketBufferTest.StepPastValidDataDoesNotAdvancePosition .......................................   Passed    0.00 sec
+      Start 38: PacketBufferTest.StepWithinValidDataAdvancesPosition
+38/98 Test #38: PacketBufferTest.StepWithinValidDataAdvancesPosition ...........................................   Passed    0.00 sec
+      Start 39: PacketBufferTest.StepCanAdvanceExactlyToEndOfValidData
+39/98 Test #39: PacketBufferTest.StepCanAdvanceExactlyToEndOfValidData .........................................   Passed    0.00 sec
+      Start 40: PacketBufferTest.StepPastEndAfterMovingDoesNotAdvanceFurther
+40/98 Test #40: PacketBufferTest.StepPastEndAfterMovingDoesNotAdvanceFurther ...................................   Passed    0.00 sec
+      Start 41: PacketBufferTest.SeekToZeroWorksOnFreshBuffer
+41/98 Test #41: PacketBufferTest.SeekToZeroWorksOnFreshBuffer ..................................................   Passed    0.00 sec
+      Start 42: PacketBufferTest.SeekPastValidDataOnFreshBufferDoesNotMove
+42/98 Test #42: PacketBufferTest.SeekPastValidDataOnFreshBufferDoesNotMove .....................................   Passed    0.00 sec
+      Start 43: PacketBufferTest.SeekMovesToExactValidPosition
+43/98 Test #43: PacketBufferTest.SeekMovesToExactValidPosition .................................................   Passed    0.00 sec
+      Start 44: PacketBufferTest.SeekCanMoveBackwardWithinValidData
+44/98 Test #44: PacketBufferTest.SeekCanMoveBackwardWithinValidData ............................................   Passed    0.00 sec
+      Start 45: PacketBufferTest.SeekToLastValidByteWorksWhenThatByteExists
+45/98 Test #45: PacketBufferTest.SeekToLastValidByteWorksWhenThatByteExists ....................................   Passed    0.00 sec
+      Start 46: PacketBufferTest.SeekToEndOfValidDataWorks
+46/98 Test #46: PacketBufferTest.SeekToEndOfValidDataWorks .....................................................   Passed    0.00 sec
+      Start 47: PacketBufferTest.SeekPastEndOfValidDataDoesNotMove
+47/98 Test #47: PacketBufferTest.SeekPastEndOfValidDataDoesNotMove .............................................   Passed    0.00 sec
+      Start 48: PacketBufferTest.GetAtBeginningReturnsZeroForFreshBuffer
+48/98 Test #48: PacketBufferTest.GetAtBeginningReturnsZeroForFreshBuffer .......................................   Passed    0.00 sec
+      Start 49: PacketBufferTest.GetAtUnwrittenIndexReturnsZero
+49/98 Test #49: PacketBufferTest.GetAtUnwrittenIndexReturnsZero ................................................   Passed    0.00 sec
+      Start 50: PacketBufferTest.GetAtWrittenIndexReturnsStoredByte
+50/98 Test #50: PacketBufferTest.GetAtWrittenIndexReturnsStoredByte ............................................   Passed    0.00 sec
+      Start 51: PacketBufferTest.GetDoesNotChangeCursorPosition
+51/98 Test #51: PacketBufferTest.GetDoesNotChangeCursorPosition ................................................   Passed    0.00 sec
+      Start 52: PacketBufferTest.ReadSingleByteFromFreshBufferReturnsZeroAndDoesNotAdvance
+52/98 Test #52: PacketBufferTest.ReadSingleByteFromFreshBufferReturnsZeroAndDoesNotAdvance .....................   Passed    0.00 sec
+      Start 53: PacketBufferTest.ReadSingleByteReturnsStoredValueAndAdvances
+53/98 Test #53: PacketBufferTest.ReadSingleByteReturnsStoredValueAndAdvances ...................................   Passed    0.00 sec
+      Start 54: PacketBufferTest.RepeatedSingleByteReadsAdvanceSequentiallyOverValidData
+54/98 Test #54: PacketBufferTest.RepeatedSingleByteReadsAdvanceSequentiallyOverValidData .......................   Passed    0.00 sec
+      Start 55: PacketBufferTest.ReadSingleByteAtLastValidByteAdvancesToEnd
+55/98 Test #55: PacketBufferTest.ReadSingleByteAtLastValidByteAdvancesToEnd ....................................   Passed    0.00 sec
+      Start 56: PacketBufferTest.ReadSingleByteAtEndReturnsZeroAndDoesNotAdvanceFurther
+56/98 Test #56: PacketBufferTest.ReadSingleByteAtEndReturnsZeroAndDoesNotAdvanceFurther ........................   Passed    0.00 sec
+      Start 57: PacketBufferTest.GetRangeFromFreshBufferIsEmpty
+57/98 Test #57: PacketBufferTest.GetRangeFromFreshBufferIsEmpty ................................................   Passed    0.00 sec
+      Start 58: PacketBufferTest.GetRangeFromBeginningReturnsRequestedLengthWhenDataExists
+58/98 Test #58: PacketBufferTest.GetRangeFromBeginningReturnsRequestedLengthWhenDataExists .....................   Passed    0.00 sec
+      Start 59: PacketBufferTest.GetRangeDoesNotChangeCursorPosition
+59/98 Test #59: PacketBufferTest.GetRangeDoesNotChangeCursorPosition ...........................................   Passed    0.00 sec
+      Start 60: PacketBufferTest.GetRangeCanReadSingleByteAtLastValidIndex
+60/98 Test #60: PacketBufferTest.GetRangeCanReadSingleByteAtLastValidIndex .....................................   Passed    0.00 sec
+      Start 61: PacketBufferTest.GetRangeBeyondValidDataIsEmpty
+61/98 Test #61: PacketBufferTest.GetRangeBeyondValidDataIsEmpty ................................................   Passed    0.00 sec
+      Start 62: PacketBufferTest.GetRangeStartingPastValidDataIsEmpty
+62/98 Test #62: PacketBufferTest.GetRangeStartingPastValidDataIsEmpty ..........................................   Passed    0.00 sec
+      Start 63: PacketBufferTest.ReadU16FromFreshBufferReturnsZeroAndDoesNotAdvance
+63/98 Test #63: PacketBufferTest.ReadU16FromFreshBufferReturnsZeroAndDoesNotAdvance ............................   Passed    0.00 sec
+      Start 64: PacketBufferTest.ReadU16WithOnlyOneAvailableByteReturnsZeroAndDoesNotAdvance
+64/98 Test #64: PacketBufferTest.ReadU16WithOnlyOneAvailableByteReturnsZeroAndDoesNotAdvance ...................   Passed    0.00 sec
+      Start 65: PacketBufferTest.ReadU16AdvancesPositionByTwo
+65/98 Test #65: PacketBufferTest.ReadU16AdvancesPositionByTwo ..................................................   Passed    0.00 sec
+      Start 66: PacketBufferTest.ReadU16UsesNetworkByteOrder
+66/98 Test #66: PacketBufferTest.ReadU16UsesNetworkByteOrder ...................................................   Passed    0.00 sec
+      Start 67: PacketBufferTest.ReadU32FromFreshBufferReturnsZeroAndDoesNotAdvance
+67/98 Test #67: PacketBufferTest.ReadU32FromFreshBufferReturnsZeroAndDoesNotAdvance ............................   Passed    0.00 sec
+      Start 68: PacketBufferTest.ReadU32WithPartialDataReturnsZeroAndDoesNotAdvance
+68/98 Test #68: PacketBufferTest.ReadU32WithPartialDataReturnsZeroAndDoesNotAdvance ............................   Passed    0.00 sec
+      Start 69: PacketBufferTest.ReadU32AdvancesPositionByFour
+69/98 Test #69: PacketBufferTest.ReadU32AdvancesPositionByFour .................................................   Passed    0.00 sec
+      Start 70: PacketBufferTest.ReadU32UsesNetworkByteOrder
+70/98 Test #70: PacketBufferTest.ReadU32UsesNetworkByteOrder ...................................................   Passed    0.00 sec
+      Start 71: PacketBufferTest.MixedReadsAdvanceByTotalBytesConsumed
+71/98 Test #71: PacketBufferTest.MixedReadsAdvanceByTotalBytesConsumed .........................................   Passed    0.00 sec
+      Start 72: PacketBufferTest.SetCanCreateSparseValidPrefix
+72/98 Test #72: PacketBufferTest.SetCanCreateSparseValidPrefix .................................................   Passed    0.00 sec
+      Start 73: PacketBufferWriteTests.WriteStoresByteAndAdvancesPosition
+73/98 Test #73: PacketBufferWriteTests.WriteStoresByteAndAdvancesPosition ......................................   Passed    0.00 sec
+      Start 74: PacketBufferWriteTests.WriteFailsAtEndOfBuffer
+74/98 Test #74: PacketBufferWriteTests.WriteFailsAtEndOfBuffer .................................................   Passed    0.00 sec
+      Start 75: PacketBufferWriteTests.WriteU8MatchesWrite
+75/98 Test #75: PacketBufferWriteTests.WriteU8MatchesWrite .....................................................   Passed    0.00 sec
+      Start 76: PacketBufferWriteTests.WriteU16WritesBigEndian
+76/98 Test #76: PacketBufferWriteTests.WriteU16WritesBigEndian .................................................   Passed    0.00 sec
+      Start 77: PacketBufferWriteTests.WriteU16FailsCleanlyWhenOnlyOneByteRemains
+77/98 Test #77: PacketBufferWriteTests.WriteU16FailsCleanlyWhenOnlyOneByteRemains ..............................   Passed    0.00 sec
+      Start 78: PacketBufferWriteTests.WriteU32WritesBigEndian
+78/98 Test #78: PacketBufferWriteTests.WriteU32WritesBigEndian .................................................   Passed    0.00 sec
+      Start 79: PacketBufferWriteTests.WriteU32FailsCleanlyWhenNotEnoughSpaceRemains
+79/98 Test #79: PacketBufferWriteTests.WriteU32FailsCleanlyWhenNotEnoughSpaceRemains ...........................   Passed    0.00 sec
+      Start 80: PacketBufferQNameTests.WriteQNameEmptyStringWritesRootLabel
+80/98 Test #80: PacketBufferQNameTests.WriteQNameEmptyStringWritesRootLabel ....................................   Passed    0.00 sec
+      Start 81: PacketBufferQNameTests.WriteQNameSingleDotWritesRootLabel
+81/98 Test #81: PacketBufferQNameTests.WriteQNameSingleDotWritesRootLabel ......................................   Passed    0.00 sec
+      Start 82: PacketBufferQNameTests.WriteQNameSingleLabelEncodesCorrectly
+82/98 Test #82: PacketBufferQNameTests.WriteQNameSingleLabelEncodesCorrectly ...................................   Passed    0.00 sec
+      Start 83: PacketBufferQNameTests.WriteQNameMultiLabelEncodesCorrectly
+83/98 Test #83: PacketBufferQNameTests.WriteQNameMultiLabelEncodesCorrectly ....................................   Passed    0.00 sec
+      Start 84: PacketBufferQNameTests.WriteQNameRejectsDoubleDot
+84/98 Test #84: PacketBufferQNameTests.WriteQNameRejectsDoubleDot ..............................................   Passed    0.00 sec
+      Start 85: PacketBufferQNameTests.WriteQNameRejectsLeadingDot
+85/98 Test #85: PacketBufferQNameTests.WriteQNameRejectsLeadingDot .............................................***Failed    0.00 sec
+Running main() from /usr/src/debug/gtest/googletest-1.17.0/googletest/src/gtest_main.cc
+Note: Google Test filter = PacketBufferQNameTests.WriteQNameRejectsLeadingDot
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PacketBufferQNameTests
+[ RUN      ] PacketBufferQNameTests.WriteQNameRejectsLeadingDot
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:626: Failure
+Value of: buffer.ok()
+  Actual: true
+Expected: false
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:627: Failure
+Expected equality of these values:
+  buffer.last_error()
+    Which is: 1-byte object <00>
+  BufferError::invalid_qname
+    Which is: 1-byte object <03>
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:628: Failure
+Expected equality of these values:
+  buffer.position()
+    Which is: 6
+  0u
+    Which is: 0
+
+[  FAILED  ] PacketBufferQNameTests.WriteQNameRejectsLeadingDot (0 ms)
+[----------] 1 test from PacketBufferQNameTests (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PacketBufferQNameTests.WriteQNameRejectsLeadingDot
+
+ 1 FAILED TEST
+
+      Start 86: PacketBufferQNameTests.WriteQNameTrailingDotShouldEncodeSameAsWithoutTrailingDot
+86/98 Test #86: PacketBufferQNameTests.WriteQNameTrailingDotShouldEncodeSameAsWithoutTrailingDot ...............***Failed    0.00 sec
+Running main() from /usr/src/debug/gtest/googletest-1.17.0/googletest/src/gtest_main.cc
+Note: Google Test filter = PacketBufferQNameTests.WriteQNameTrailingDotShouldEncodeSameAsWithoutTrailingDot
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PacketBufferQNameTests
+[ RUN      ] PacketBufferQNameTests.WriteQNameTrailingDotShouldEncodeSameAsWithoutTrailingDot
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:642: Failure
+Expected equality of these values:
+  b.position()
+    Which is: 0
+  a.position()
+    Which is: 13
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: '\a' (7)
+Mismatch at byte 0
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'e' (101, 0x65)
+Mismatch at byte 1
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'x' (120, 0x78)
+Mismatch at byte 2
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'a' (97, 0x61)
+Mismatch at byte 3
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'm' (109, 0x6D)
+Mismatch at byte 4
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'p' (112, 0x70)
+Mismatch at byte 5
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'l' (108, 0x6C)
+Mismatch at byte 6
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'e' (101, 0x65)
+Mismatch at byte 7
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: '\x3' (3)
+Mismatch at byte 8
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'c' (99, 0x63)
+Mismatch at byte 9
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'o' (111, 0x6F)
+Mismatch at byte 10
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:646: Failure
+Expected equality of these values:
+  b.get(i)
+    Which is: '\0'
+  a.get(i)
+    Which is: 'm' (109, 0x6D)
+Mismatch at byte 11
+
+[  FAILED  ] PacketBufferQNameTests.WriteQNameTrailingDotShouldEncodeSameAsWithoutTrailingDot (0 ms)
+[----------] 1 test from PacketBufferQNameTests (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PacketBufferQNameTests.WriteQNameTrailingDotShouldEncodeSameAsWithoutTrailingDot
+
+ 1 FAILED TEST
+
+      Start 87: PacketBufferQNameTests.WriteQNameAcceptsLabelOfLengthSixtyThree
+87/98 Test #87: PacketBufferQNameTests.WriteQNameAcceptsLabelOfLengthSixtyThree ................................***Failed    0.00 sec
+Running main() from /usr/src/debug/gtest/googletest-1.17.0/googletest/src/gtest_main.cc
+Note: Google Test filter = PacketBufferQNameTests.WriteQNameAcceptsLabelOfLengthSixtyThree
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PacketBufferQNameTests
+[ RUN      ] PacketBufferQNameTests.WriteQNameAcceptsLabelOfLengthSixtyThree
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:657: Failure
+Value of: buffer.ok()
+  Actual: false
+Expected: true
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:658: Failure
+Expected equality of these values:
+  buffer.last_error()
+    Which is: 1-byte object <04>
+  BufferError::none
+    Which is: 1-byte object <00>
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:659: Failure
+Expected equality of these values:
+  buffer.position()
+    Which is: 0
+  65u
+    Which is: 65
+
+/home/lilman/Documents/personal/cpp-dns/tests/test_packet_buffer.cpp:660: Failure
+Expected equality of these values:
+  buffer.get(0)
+    Which is: '\0'
+  63
+
+[  FAILED  ] PacketBufferQNameTests.WriteQNameAcceptsLabelOfLengthSixtyThree (0 ms)
+[----------] 1 test from PacketBufferQNameTests (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PacketBufferQNameTests.WriteQNameAcceptsLabelOfLengthSixtyThree
+
+ 1 FAILED TEST
+
+      Start 88: PacketBufferQNameTests.WriteQNameRejectsLabelLongerThanSixtyThree
+88/98 Test #88: PacketBufferQNameTests.WriteQNameRejectsLabelLongerThanSixtyThree ..............................   Passed    0.00 sec
+      Start 89: PacketBufferQNameTests.WriteQNameRejectsNamesWhoseWireFormatExceedsTwoHundredFiftyFiveBytes
+89/98 Test #89: PacketBufferQNameTests.WriteQNameRejectsNamesWhoseWireFormatExceedsTwoHundredFiftyFiveBytes ....   Passed    0.00 sec
+      Start 90: PacketBufferQNameTests.WriteQNameSucceedsWhenRemainingSpaceExactlyMatchesActualEncodedLength
+90/98 Test #90: PacketBufferQNameTests.WriteQNameSucceedsWhenRemainingSpaceExactlyMatchesActualEncodedLength ...   Passed    0.00 sec
+      Start 91: ResultCodeTest.MapsZeroToNoError
+91/98 Test #91: ResultCodeTest.MapsZeroToNoError ...............................................................   Passed    0.00 sec
+      Start 92: ResultCodeTest.MapsOneToFormErr
+92/98 Test #92: ResultCodeTest.MapsOneToFormErr ................................................................   Passed    0.00 sec
+      Start 93: ResultCodeTest.MapsTwoToServFail
+93/98 Test #93: ResultCodeTest.MapsTwoToServFail ...............................................................   Passed    0.00 sec
+      Start 94: ResultCodeTest.MapsThreeToNxDomain
+94/98 Test #94: ResultCodeTest.MapsThreeToNxDomain .............................................................   Passed    0.00 sec
+      Start 95: ResultCodeTest.MapsFourToNotImp
+95/98 Test #95: ResultCodeTest.MapsFourToNotImp ................................................................   Passed    0.00 sec
+      Start 96: ResultCodeTest.MapsFiveToRefused
+96/98 Test #96: ResultCodeTest.MapsFiveToRefused ...............................................................   Passed    0.00 sec
+      Start 97: ResultCodeTest.MapsUnknownCodeToNoError
+97/98 Test #97: ResultCodeTest.MapsUnknownCodeToNoError ........................................................   Passed    0.00 sec
+      Start 98: GTestSanityCheck.TrueIsTrue
+98/98 Test #98: GTestSanityCheck.TrueIsTrue ....................................................................   Passed    0.00 sec
+
+97% tests passed, 3 tests failed out of 98
+
+Total Test time (real) =   0.44 sec
+
+The following tests FAILED:
+	 85 - PacketBufferQNameTests.WriteQNameRejectsLeadingDot (Failed)
+	 86 - PacketBufferQNameTests.WriteQNameTrailingDotShouldEncodeSameAsWithoutTrailingDot (Failed)
+	 87 - PacketBufferQNameTests.WriteQNameAcceptsLabelOfLengthSixtyThree (Failed)
