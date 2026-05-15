@@ -30,7 +30,7 @@ DnsRecord decode_record(PacketBuffer& buffer)
     const std::uint16_t qtype_num{buffer.read_u16()};
     if (!buffer.ok())
     {
-        return UnknownRecord{};
+        return UnknownRecord{.domain = domain, .qtype = 0, .data_len = 0, .ttl = 0};
     }
 
     const QueryType qtype{to_query_type(qtype_num)};
@@ -38,19 +38,21 @@ DnsRecord decode_record(PacketBuffer& buffer)
     static_cast<void>(buffer.read_u16()); // class
     if (!buffer.ok())
     {
-        return UnknownRecord{};
+        return UnknownRecord{.domain = domain, .qtype = qtype_num, .data_len = 0, .ttl = 0};
     }
 
     const std::uint32_t ttl{buffer.read_u32()};
     if (!buffer.ok())
     {
-        return UnknownRecord{};
+        return UnknownRecord{
+
+            .domain = domain, .qtype = qtype_num, .data_len = 0, .ttl = 0};
     }
 
     const std::uint16_t data_length{buffer.read_u16()};
     if (!buffer.ok())
     {
-        return UnknownRecord{};
+        return UnknownRecord{.domain = domain, .qtype = qtype_num, .data_len = 0, .ttl = ttl};
     }
 
     switch (qtype)
