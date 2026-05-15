@@ -44,3 +44,4 @@ Thumbs.db
 
 # Local scratch files
 buf.txt
+.cache/

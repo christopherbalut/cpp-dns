@@ -3,7 +3,7 @@
 #include "dns/question.hpp"
 #include "dns/types.hpp"
 #include <array>
-#include <iostream>
+#include <type_traits>
 #include <variant>
 
 namespace dns
@@ -58,6 +58,11 @@ DnsRecord decode_record(PacketBuffer& buffer)
 
 std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
 {
+    if (!buffer.ok())
+    {
+        return 0;
+    }
+
     auto start_position{buffer.position()};
 
     std::visit(
@@ -68,19 +73,42 @@ std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
             if constexpr (std::is_same_v<T, ARecord>)
             {
                 buffer.write_qname(rec.domain);
+                if (!buffer.ok())
+                    return;
+
                 buffer.write_u16(1);
+                if (!buffer.ok())
+                    return;
+
                 buffer.write_u16(1);
+                if (!buffer.ok())
+                    return;
+
                 buffer.write_u32(rec.ttl);
+                if (!buffer.ok())
+                    return;
+
                 buffer.write_u16(4);
+                if (!buffer.ok())
+                    return;
 
                 buffer.write_u8(rec.addr[0]);
+                if (!buffer.ok())
+                    return;
+
                 buffer.write_u8(rec.addr[1]);
+                if (!buffer.ok())
+                    return;
+
                 buffer.write_u8(rec.addr[2]);
+                if (!buffer.ok())
+                    return;
+
                 buffer.write_u8(rec.addr[3]);
             }
             else if constexpr (std::is_same_v<T, UnknownRecord>)
             {
-                std::cout << "skip for now \n";
+                // skip unsupported record types for now
             }
         },
         record);

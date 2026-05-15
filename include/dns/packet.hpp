@@ -23,7 +23,7 @@ struct DnsPacket
 
     void decode_from_buffer(PacketBuffer& buffer);
 
-    void write_from_buffer(PacketBuffer& buffer);
+    void write_to_buffer(PacketBuffer& buffer);
 };
 
 } // namespace dns

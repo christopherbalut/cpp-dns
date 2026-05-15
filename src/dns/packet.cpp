@@ -2,9 +2,19 @@
 #include "dns/buffer.hpp"
 #include "dns/header.hpp"
 #include "dns/record.hpp"
+#include <algorithm>
+#include <cstdint>
+#include <variant>
 
 namespace dns
 {
+namespace
+{
+bool is_writable_record(const DnsRecord& record)
+{
+    return !std::holds_alternative<UnknownRecord>(record);
+}
+} // namespace
 void DnsPacket::decode_from_buffer(PacketBuffer& buffer)
 {
     header = DnsHeader{};
@@ -49,37 +59,76 @@ void DnsPacket::decode_from_buffer(PacketBuffer& buffer)
     }
 }
 
-void DnsPacket::write_from_buffer(PacketBuffer& buffer)
+void DnsPacket::write_to_buffer(PacketBuffer& buffer)
 {
+    auto count_writable = [](const auto& records) -> std::uint16_t
+    {
+        return static_cast<std::uint16_t>(
+            std::count_if(records.begin(), records.end(), is_writable_record));
+    };
+
+    if (!buffer.ok())
+    {
+        return;
+    }
     // Update header count to match the current entries
     header.questions = static_cast<std::uint16_t>(questions.size());
-    header.answers = static_cast<std::uint16_t>(answers.size());
-    header.authoritative_entries = static_cast<std::uint16_t>(authorities.size());
-    header.resource_entries = static_cast<std::uint16_t>(resources.size());
+    header.answers = count_writable(answers);
+    header.authoritative_entries = count_writable(authorities);
+    header.resource_entries = count_writable(resources);
 
     header.write(buffer); // write 12 byte header first
+    if (!buffer.ok())
+    {
+        return;
+    }
 
     for (const DnsQuestion& question : questions) // write every question
     {
         question.write(buffer);
+        if (!buffer.ok())
+        {
+            return;
+        }
     }
 
-    for (const DnsRecord& record : answers) // write every answer
+    for (const DnsRecord& record : answers)
     {
-        static_cast<void>(
-            write_record(record, buffer)); // we don't need return value, so we cast to void
-    }
-
-    for (const DnsRecord& record :
-         authorities) // write every authority record in authoriryt section
-    {
+        if (!is_writable_record(record))
+        {
+            continue;
+        }
         static_cast<void>(write_record(record, buffer));
+        if (!buffer.ok())
+        {
+            return;
+        }
     }
 
-    for (const DnsRecord& record :
-         resources) // write every additional resource record in additional section
+    for (const DnsRecord& record : authorities)
     {
+        if (!is_writable_record(record))
+        {
+            continue;
+        }
         static_cast<void>(write_record(record, buffer));
+        if (!buffer.ok())
+        {
+            return;
+        }
+    }
+
+    for (const DnsRecord& record : resources)
+    {
+        if (!is_writable_record(record))
+        {
+            continue;
+        }
+        static_cast<void>(write_record(record, buffer));
+        if (!buffer.ok())
+        {
+            return;
+        }
     }
 }
 }; // namespace dns

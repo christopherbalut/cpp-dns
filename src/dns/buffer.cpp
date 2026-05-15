@@ -279,6 +279,11 @@ void PacketBuffer::clear_error()
 
 void PacketBuffer::write(std::uint8_t value)
 {
+    if (!ok())
+    {
+        return;
+    }
+
     if (!can_write(1))
     {
         last_error_ = BufferError::end_of_buffer;
@@ -288,7 +293,6 @@ void PacketBuffer::write(std::uint8_t value)
     buffer_[position_] = value;
     ++position_;
     update_size_after_write();
-    last_error_ = BufferError::none;
 }
 
 void PacketBuffer::write_u8(std::uint8_t value)
@@ -298,6 +302,11 @@ void PacketBuffer::write_u8(std::uint8_t value)
 
 void PacketBuffer::write_u16(std::uint16_t value)
 {
+    if (!ok())
+    {
+        return;
+    }
+
     if (!can_write(2))
     {
         last_error_ = BufferError::end_of_buffer;
@@ -311,11 +320,15 @@ void PacketBuffer::write_u16(std::uint16_t value)
     position_++;
 
     update_size_after_write();
-    last_error_ = BufferError::none;
 }
 
 void PacketBuffer::write_u32(std::uint32_t value)
 {
+    if (!ok())
+    {
+        return;
+    }
+
     if (!can_write(4))
     {
         last_error_ = BufferError::end_of_buffer;
@@ -335,11 +348,14 @@ void PacketBuffer::write_u32(std::uint32_t value)
     position_++;
 
     update_size_after_write();
-    last_error_ = BufferError::none;
 }
 
 void PacketBuffer::write_qname(std::string_view qname)
 {
+    if (!ok())
+    {
+        return;
+    }
     // check if we can write
     if (qname.empty() || qname == ".")
     {
@@ -355,9 +371,10 @@ void PacketBuffer::write_qname(std::string_view qname)
     if (qname.empty())
     {
         write_u8(0);
+        return;
     }
     // validate and compute encoded size
-    std::size_t encoded_size{0};
+    std::size_t encoded_size{1};
     std::size_t current_label_length{0};
 
     for (char ch : qname)
@@ -421,9 +438,8 @@ void PacketBuffer::write_qname(std::string_view qname)
         label_start = i + 1;
     }
     buffer_[position_] = 0;
-    position_++;
+    ++position_;
     update_size_after_write();
-    last_error_ = BufferError::none;
 }
 
 } // namespace dns

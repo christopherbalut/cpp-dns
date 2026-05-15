@@ -33,7 +33,15 @@ void DnsHeader::decode(PacketBuffer& buffer)
 
 void DnsHeader::write(PacketBuffer& buffer) const
 {
-    buffer.write_u16(id);       // put header id in first two bytes
+    if (!buffer.ok())
+    {
+        return;
+    }
+    buffer.write_u16(id); // put header id in first two bytes
+    if (!buffer.ok())
+    {
+        return;
+    }
     std::uint8_t top_8_bits{0}; // create upper 8 bits of 0's so we can write in them after
     top_8_bits |= static_cast<std::uint8_t>(recursion_desired ? (1U << 0) : 0U);    // bit 0
     top_8_bits |= static_cast<std::uint8_t>(truncated_message ? (1U << 1) : 0U);    // bit 1
@@ -42,6 +50,10 @@ void DnsHeader::write(PacketBuffer& buffer) const
     top_8_bits |= static_cast<std::uint8_t>(response ? (1U << 7) : 0U);             // bit 7
 
     buffer.write_u8(top_8_bits); // after assigning, we actually write the 8 bits/ 1 byte
+    if (!buffer.ok())
+    {
+        return;
+    }
 
     std::uint8_t bottom_8_bits{0}; // initialize the bottom 8 byte
     bottom_8_bits |=
@@ -52,11 +64,29 @@ void DnsHeader::write(PacketBuffer& buffer) const
     bottom_8_bits |= static_cast<std::uint8_t>(recursion_available ? (1U << 7) : 0U); // bit 7
 
     buffer.write_u8(bottom_8_bits); // write the bottom 8 bits or 1 byte
-
+    if (!buffer.ok())
+    {
+        return;
+    }
     // write 2 bytes of all the header table of contents
     buffer.write_u16(questions);
+    if (!buffer.ok())
+    {
+        return;
+    }
+
     buffer.write_u16(answers);
+    if (!buffer.ok())
+    {
+        return;
+    }
+
     buffer.write_u16(authoritative_entries);
+    if (!buffer.ok())
+    {
+        return;
+    }
+
     buffer.write_u16(resource_entries);
 }
 } // namespace dns

@@ -20,9 +20,29 @@ void DnsQuestion::decode(PacketBuffer& buffer)
 
 void DnsQuestion::write(PacketBuffer& buffer) const
 {
+    if (!buffer.ok())
+    {
+        return;
+    }
+
     buffer.write_qname(name);
+    if (!buffer.ok())
+    {
+        return;
+    }
+
     const std::uint16_t typenumber{static_cast<std::uint16_t>(qtype)};
     buffer.write_u16(typenumber);
+    if (!buffer.ok())
+    {
+        return;
+    }
+
     buffer.write_u16(1);
+
+    if (!buffer.ok())
+    {
+        return;
+    }
 }
 }; // namespace dns
