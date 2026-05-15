@@ -1,11 +1,14 @@
 #include "dns/question.hpp"
 #include "dns/buffer.hpp"
 #include "dns/types.hpp"
-#include <memory>
 #include <utility>
 
 namespace dns
 {
+namespace
+{
+constexpr std::uint16_t dns_class_in = 1;
+} // namespace
 DnsQuestion::DnsQuestion(std::string question_name, QueryType question_type)
     : name{std::move(question_name)}, qtype{question_type}
 {
@@ -13,9 +16,30 @@ DnsQuestion::DnsQuestion(std::string question_name, QueryType question_type)
 
 void DnsQuestion::decode(PacketBuffer& buffer)
 {
+    if (!buffer.ok())
+    {
+        return;
+    }
+
     buffer.read_qname(name);
-    qtype = to_query_type(buffer.read_u16());
+    if (!buffer.ok())
+    {
+        return;
+    }
+
+    const std::uint16_t typenumber(buffer.read_u16());
+    if (!buffer.ok())
+    {
+        return;
+    }
+
+    qtype = to_query_type(typenumber);
+
     static_cast<void>(buffer.read_u16());
+    if (!buffer.ok())
+    {
+        return;
+    }
 }
 
 void DnsQuestion::write(PacketBuffer& buffer) const
@@ -38,7 +62,7 @@ void DnsQuestion::write(PacketBuffer& buffer) const
         return;
     }
 
-    buffer.write_u16(1);
+    buffer.write_u16(dns_class_in);
 
     if (!buffer.ok())
     {

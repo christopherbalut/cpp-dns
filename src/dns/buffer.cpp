@@ -4,7 +4,6 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
 #include <span>
 #include <string>
 #include <string_view>
@@ -37,7 +36,6 @@ void PacketBuffer::step(std::size_t steps)
 {
     if (position_ > size_ || steps > (size_ - position_))
     {
-        std::cout << "position out of bounds in step method of PacketBuffer\n";
         last_error_ = BufferError::position_out_of_bounds;
         return;
     }
@@ -50,7 +48,6 @@ void PacketBuffer::seek(std::size_t position)
 {
     if (position > size_)
     {
-        std::cout << "position out of bounds in seek method of PacketBuffer\n";
         last_error_ = BufferError::position_out_of_bounds;
         return;
     }
@@ -63,7 +60,6 @@ std::uint8_t PacketBuffer::read_single_byte()
 {
     if (position_ >= size_)
     {
-        std::cout << "read_single_byte(): reached end of valid buffer data\n";
         last_error_ = BufferError::end_of_buffer;
         return 0;
     }
@@ -158,7 +154,6 @@ void PacketBuffer::read_qname(std::string& out)
     {
         if (pos >= size_)
         {
-            std::cout << "read_qname(): position out of bounds\n";
             last_error_ = BufferError::end_of_buffer;
             return;
         }
@@ -175,14 +170,12 @@ void PacketBuffer::read_qname(std::string& out)
         {
             if (jumps_performed >= max_jumps)
             {
-                std::cout << "read_qname(): too many compression jumps\n";
                 last_error_ = BufferError::position_out_of_bounds;
                 return;
             }
 
             if (pos + 1 >= size_)
             {
-                std::cout << "read_qname(): incomplete compression pointer\n";
                 last_error_ = BufferError::end_of_buffer;
                 return;
             }
@@ -193,7 +186,6 @@ void PacketBuffer::read_qname(std::string& out)
 
             if (offset >= size_)
             {
-                std::cout << "read_qname(): compression pointer out of bounds\n";
                 last_error_ = BufferError::position_out_of_bounds;
                 return;
             }
@@ -217,7 +209,6 @@ void PacketBuffer::read_qname(std::string& out)
 
         if (pos + length > size_)
         {
-            std::cout << "read_qname(): label extends past end of valid buffer data\n";
             last_error_ = BufferError::end_of_buffer;
             return;
         }

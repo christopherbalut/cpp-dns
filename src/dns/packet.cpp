@@ -24,7 +24,16 @@ void DnsPacket::decode_from_buffer(PacketBuffer& buffer)
     authorities.clear();
     resources.clear();
 
+    if (!buffer.ok())
+    {
+        return;
+    }
+
     header.decode(buffer);
+    if (!buffer.ok())
+    {
+        return;
+    }
 
     const std::size_t question_count{static_cast<std::size_t>(header.questions)};
     const std::size_t answer_count{static_cast<std::size_t>(header.answers)};
@@ -40,25 +49,43 @@ void DnsPacket::decode_from_buffer(PacketBuffer& buffer)
     {
         DnsQuestion question{};
         question.decode(buffer);
-        questions.emplace_back(question);
+        if (!buffer.ok())
+        {
+            return;
+        }
+        questions.emplace_back(std::move(question));
     }
 
     for (std::size_t i{0}; i < answer_count; ++i)
     {
-        answers.emplace_back(decode_record(buffer));
+        DnsRecord record{decode_record(buffer)};
+        if (!buffer.ok())
+        {
+            return;
+        }
+        answers.emplace_back(std::move(record));
     }
 
     for (std::size_t i{0}; i < authority_count; ++i)
     {
-        authorities.emplace_back(decode_record(buffer));
+        DnsRecord record{decode_record(buffer)};
+        if (!buffer.ok())
+        {
+            return;
+        }
+        authorities.emplace_back(std::move(record));
     }
 
     for (std::size_t i{0}; i < resource_count; ++i)
     {
-        resources.emplace_back(decode_record(buffer));
+        DnsRecord record{decode_record(buffer)};
+        if (!buffer.ok())
+        {
+            return;
+        }
+        resources.emplace_back(std::move(record));
     }
 }
-
 void DnsPacket::write_to_buffer(PacketBuffer& buffer)
 {
     auto count_writable = [](const auto& records) -> std::uint16_t
