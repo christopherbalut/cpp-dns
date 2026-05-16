@@ -240,4 +240,92 @@ TEST(DnsHeaderTest, DecodeExhaustivelyChecksAll65536PossibleFlagWords)
     }
 }
 
+TEST(DnsHeaderWriteTest, DefaultHeaderWritesTwelveZeroBytes)
+{
+    dns::DnsHeader header{};
+    dns::PacketBuffer buffer{};
+
+    header.write(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 12u);
+
+    for (std::size_t i = 0; i < 12; ++i)
+    {
+        EXPECT_EQ(buffer.get(i), 0u);
+    }
+}
+
+TEST(DnsHeaderWriteTest, WritesIdAndCountsInNetworkByteOrder)
+{
+    dns::DnsHeader header{};
+    dns::PacketBuffer buffer{};
+
+    header.id = 0x1234;
+    header.questions = 0x0102;
+    header.answers = 0x0304;
+    header.authoritative_entries = 0x0506;
+    header.resource_entries = 0x0708;
+
+    header.write(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 12u);
+
+    EXPECT_EQ(buffer.get(0), 0x12);
+    EXPECT_EQ(buffer.get(1), 0x34);
+
+    EXPECT_EQ(buffer.get(4), 0x01);
+    EXPECT_EQ(buffer.get(5), 0x02);
+
+    EXPECT_EQ(buffer.get(6), 0x03);
+    EXPECT_EQ(buffer.get(7), 0x04);
+
+    EXPECT_EQ(buffer.get(8), 0x05);
+    EXPECT_EQ(buffer.get(9), 0x06);
+
+    EXPECT_EQ(buffer.get(10), 0x07);
+    EXPECT_EQ(buffer.get(11), 0x08);
+}
+
+TEST(DnsHeaderWriteTest, PacksTopFlagsByteCorrectly)
+{
+    dns::DnsHeader header{};
+    dns::PacketBuffer buffer{};
+
+    header.recursion_desired = true;    // bit 0
+    header.truncated_message = true;    // bit 1
+    header.authoritative_answer = true; // bit 2
+    header.opcode = 5;                  // bits 3-6
+    header.response = true;             // bit 7
+
+    header.write(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 12u);
+
+    // 0x01 + 0x02 + 0x04 + (5 << 3 = 0x28) + 0x80 = 0xAF
+    EXPECT_EQ(buffer.get(2), 0xAF);
+}
+
+TEST(DnsHeaderWriteTest, PacksBottomFlagsByteCorrectly)
+{
+    dns::DnsHeader header{};
+    dns::PacketBuffer buffer{};
+
+    header.rescode = dns::to_result_code(5); // low nibble = 0x05
+    header.checking_disabled = true;         // bit 4
+    header.authed_data = true;               // bit 5
+    header.z = true;                         // bit 6
+    header.recursion_available = true;       // bit 7
+
+    header.write(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 12u);
+
+    // 0x05 + 0x10 + 0x20 + 0x40 + 0x80 = 0xF5
+    EXPECT_EQ(buffer.get(3), 0xF5);
+}
+
 } // namespace

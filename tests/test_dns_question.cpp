@@ -80,6 +80,76 @@ std::size_t write_compressed_question(PacketBuffer& buffer, std::size_t pos,
     pos = write_u16(buffer, pos, qclass);
     return pos;
 }
+
+TEST(DnsQuestionWriteTest, WriteMultiLabelQuestionCorrectly)
+{
+    PacketBuffer buffer{};
+    DnsQuestion question{"google.com", QueryType::A};
+
+    question.write(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 16u);
+
+    EXPECT_EQ(buffer.get(0), 6u);
+    EXPECT_EQ(buffer.get(1), static_cast<std::uint8_t>('g'));
+    EXPECT_EQ(buffer.get(2), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(3), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(4), static_cast<std::uint8_t>('g'));
+    EXPECT_EQ(buffer.get(5), static_cast<std::uint8_t>('l'));
+    EXPECT_EQ(buffer.get(6), static_cast<std::uint8_t>('e'));
+
+    EXPECT_EQ(buffer.get(7), 3u);
+    EXPECT_EQ(buffer.get(8), static_cast<std::uint8_t>('c'));
+    EXPECT_EQ(buffer.get(9), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(10), static_cast<std::uint8_t>('m'));
+
+    EXPECT_EQ(buffer.get(11), 0u);
+
+    EXPECT_EQ(buffer.get(12), 0x00);
+    EXPECT_EQ(buffer.get(13), 0x01);
+
+    EXPECT_EQ(buffer.get(14), 0x00);
+    EXPECT_EQ(buffer.get(15), 0x01);
+}
+
+TEST(DnsQuestionWriteTest, WriteRootQuestionCorrectly)
+{
+    PacketBuffer buffer{};
+    DnsQuestion question{"", QueryType::A};
+
+    question.write(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 5u);
+
+    EXPECT_EQ(buffer.get(0), 0u);
+    EXPECT_EQ(buffer.get(1), 0x00);
+    EXPECT_EQ(buffer.get(2), 0x01);
+    EXPECT_EQ(buffer.get(3), 0x00);
+    EXPECT_EQ(buffer.get(4), 0x01);
+}
+
+TEST(DnsQuestionWriteTest, WriteThenDecodeRoundTrip)
+{
+    PacketBuffer buffer{};
+    DnsQuestion written{"www.example.com", QueryType::A};
+
+    written.write(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    DnsQuestion decoded{};
+    decoded.decode(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(decoded.name, written.name);
+    EXPECT_EQ(decoded.qtype, written.qtype);
+}
+
 } // namespace
 
 TEST(DnsQuestionTest, DefaultConstructorStartsEmptyAndUnknown)
