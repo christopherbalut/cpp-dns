@@ -334,3 +334,101 @@ TEST(DnsRecordTest, UnknownRecordShouldNeverMovePastEndOfBuffer)
     ASSERT_TRUE(std::holds_alternative<UnknownRecord>(record));
     EXPECT_LE(buffer.position(), PacketBuffer::max_size);
 }
+
+TEST(DnsRecordWriteTest, WriteARecordCorrectly)
+{
+    dns::PacketBuffer buffer{};
+
+    dns::ARecord arecord{.domain = "example.com", .addr = {1, 2, 3, 4}, .ttl = 0x11223344};
+
+    dns::DnsRecord record{arecord};
+
+    const std::size_t bytes_written = dns::write_record(record, buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(bytes_written, 27u);
+    EXPECT_EQ(buffer.position(), 27u);
+
+    // qname: 7 example 3 com 0
+    EXPECT_EQ(buffer.get(0), 7u);
+    EXPECT_EQ(buffer.get(1), static_cast<std::uint8_t>('e'));
+    EXPECT_EQ(buffer.get(2), static_cast<std::uint8_t>('x'));
+    EXPECT_EQ(buffer.get(3), static_cast<std::uint8_t>('a'));
+    EXPECT_EQ(buffer.get(4), static_cast<std::uint8_t>('m'));
+    EXPECT_EQ(buffer.get(5), static_cast<std::uint8_t>('p'));
+    EXPECT_EQ(buffer.get(6), static_cast<std::uint8_t>('l'));
+    EXPECT_EQ(buffer.get(7), static_cast<std::uint8_t>('e'));
+
+    EXPECT_EQ(buffer.get(8), 3u);
+    EXPECT_EQ(buffer.get(9), static_cast<std::uint8_t>('c'));
+    EXPECT_EQ(buffer.get(10), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(11), static_cast<std::uint8_t>('m'));
+    EXPECT_EQ(buffer.get(12), 0u);
+
+    // type A
+    EXPECT_EQ(buffer.get(13), 0x00);
+    EXPECT_EQ(buffer.get(14), 0x01);
+
+    // class IN
+    EXPECT_EQ(buffer.get(15), 0x00);
+    EXPECT_EQ(buffer.get(16), 0x01);
+
+    // ttl = 0x11223344
+    EXPECT_EQ(buffer.get(17), 0x11);
+    EXPECT_EQ(buffer.get(18), 0x22);
+    EXPECT_EQ(buffer.get(19), 0x33);
+    EXPECT_EQ(buffer.get(20), 0x44);
+
+    // rdlength = 4
+    EXPECT_EQ(buffer.get(21), 0x00);
+    EXPECT_EQ(buffer.get(22), 0x04);
+
+    // address bytes
+    EXPECT_EQ(buffer.get(23), 1u);
+    EXPECT_EQ(buffer.get(24), 2u);
+    EXPECT_EQ(buffer.get(25), 3u);
+    EXPECT_EQ(buffer.get(26), 4u);
+}
+
+TEST(DnsRecordWriteTest, WriteThenDecodeARecordRoundTrip)
+{
+    dns::PacketBuffer buffer{};
+
+    dns::ARecord written{.domain = "google.com", .addr = {8, 8, 4, 4}, .ttl = 300};
+
+    dns::DnsRecord record{written};
+
+    const std::size_t bytes_written = dns::write_record(record, buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_GT(bytes_written, 0u);
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    dns::DnsRecord decoded_record = dns::decode_record(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded_record));
+
+    const dns::ARecord& decoded = std::get<dns::ARecord>(decoded_record);
+
+    EXPECT_EQ(decoded.domain, written.domain);
+    EXPECT_EQ(decoded.addr, written.addr);
+    EXPECT_EQ(decoded.ttl, written.ttl);
+}
+
+TEST(DnsRecordWriteTest, WriteUnknownRecordWritesNothing)
+{
+    dns::PacketBuffer buffer{};
+
+    dns::UnknownRecord unknown{.domain = "example.com", .qtype = 99, .data_len = 10, .ttl = 123};
+
+    dns::DnsRecord record{unknown};
+
+    const std::size_t bytes_written = dns::write_record(record, buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(bytes_written, 0u);
+    EXPECT_EQ(buffer.position(), 0u);
+}

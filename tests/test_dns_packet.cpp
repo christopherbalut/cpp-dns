@@ -360,12 +360,6 @@ TEST(DnsPacketTest, TruncatedHeaderStillResetsPacketAndDoesNotLeaveStaleSections
     EXPECT_EQ(buffer.position(), pos);
 }
 
-/*
- * This is an integration test for normal DNS names and compression.
- * It is expected to pass once PacketBuffer::read_qname() is fully correct.
- * If it fails right now, that usually means the lower-level qname parser
- * still has one of the Rust-to-C++ translation bugs.
- */
 TEST(DnsPacketTest, DecodeQuestionAndCompressedAnswerName)
 {
     PacketBuffer buffer{};
@@ -394,4 +388,157 @@ TEST(DnsPacketTest, DecodeQuestionAndCompressedAnswerName)
     EXPECT_EQ(answer.ttl, 99U);
 
     EXPECT_EQ(buffer.position(), end);
+}
+
+TEST(DnsPacketWriteTest, WriteQueryPacketCorrectly)
+{
+    dns::DnsPacket packet{};
+    dns::PacketBuffer buffer{};
+
+    packet.header.id = 0x1234;
+    packet.header.recursion_desired = true;
+    packet.questions.emplace_back("google.com", dns::QueryType::A);
+
+    packet.write_to_buffer(buffer); // use packet.write(buffer) if that is your name
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 28u);
+
+    // Header
+    EXPECT_EQ(buffer.get(0), 0x12);
+    EXPECT_EQ(buffer.get(1), 0x34);
+
+    // top flags byte: RD = 1
+    EXPECT_EQ(buffer.get(2), 0x01);
+    EXPECT_EQ(buffer.get(3), 0x00);
+
+    EXPECT_EQ(buffer.get(4), 0x00); // questions = 1
+    EXPECT_EQ(buffer.get(5), 0x01);
+
+    EXPECT_EQ(buffer.get(6), 0x00); // answers = 0
+    EXPECT_EQ(buffer.get(7), 0x00);
+
+    EXPECT_EQ(buffer.get(8), 0x00); // authorities = 0
+    EXPECT_EQ(buffer.get(9), 0x00);
+
+    EXPECT_EQ(buffer.get(10), 0x00); // resources = 0
+    EXPECT_EQ(buffer.get(11), 0x00);
+
+    // Question: google.com, type A, class IN
+    EXPECT_EQ(buffer.get(12), 6u);
+    EXPECT_EQ(buffer.get(13), static_cast<std::uint8_t>('g'));
+    EXPECT_EQ(buffer.get(14), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(15), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(16), static_cast<std::uint8_t>('g'));
+    EXPECT_EQ(buffer.get(17), static_cast<std::uint8_t>('l'));
+    EXPECT_EQ(buffer.get(18), static_cast<std::uint8_t>('e'));
+
+    EXPECT_EQ(buffer.get(19), 3u);
+    EXPECT_EQ(buffer.get(20), static_cast<std::uint8_t>('c'));
+    EXPECT_EQ(buffer.get(21), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(22), static_cast<std::uint8_t>('m'));
+    EXPECT_EQ(buffer.get(23), 0u);
+
+    EXPECT_EQ(buffer.get(24), 0x00); // qtype A
+    EXPECT_EQ(buffer.get(25), 0x01);
+    EXPECT_EQ(buffer.get(26), 0x00); // qclass IN
+    EXPECT_EQ(buffer.get(27), 0x01);
+}
+
+TEST(DnsPacketWriteTest, WriteThenDecodeRepresentativePacketRoundTrip)
+{
+    dns::DnsPacket written{};
+    dns::PacketBuffer buffer{};
+
+    written.header.id = 0xBEEF;
+    written.header.recursion_desired = true;
+
+    written.questions.push_back(dns::DnsQuestion{"example.com", dns::QueryType::A});
+
+    written.answers.push_back(
+        dns::DnsRecord{dns::ARecord{.domain = "example.com", .addr = {1, 2, 3, 4}, .ttl = 300}});
+
+    written.authorities.push_back(
+        dns::DnsRecord{dns::ARecord{.domain = "ns.example.com", .addr = {5, 6, 7, 8}, .ttl = 400}});
+
+    written.resources.push_back(dns::DnsRecord{
+        dns::ARecord{.domain = "cache.example.com", .addr = {9, 10, 11, 12}, .ttl = 500}});
+
+    written.write_to_buffer(buffer); // use packet.write(buffer) if that is your name
+
+    ASSERT_TRUE(buffer.ok());
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    dns::DnsPacket decoded{};
+    decoded.decode_from_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    EXPECT_EQ(decoded.header.id, written.header.id);
+    EXPECT_TRUE(decoded.header.recursion_desired);
+
+    EXPECT_EQ(decoded.questions.size(), 1u);
+    EXPECT_EQ(decoded.answers.size(), 1u);
+    EXPECT_EQ(decoded.authorities.size(), 1u);
+    EXPECT_EQ(decoded.resources.size(), 1u);
+
+    EXPECT_EQ(decoded.questions[0].name, "example.com");
+    EXPECT_EQ(decoded.questions[0].qtype, dns::QueryType::A);
+
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.answers[0]));
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.authorities[0]));
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.resources[0]));
+
+    const dns::ARecord& answer = std::get<dns::ARecord>(decoded.answers[0]);
+    const dns::ARecord& authority = std::get<dns::ARecord>(decoded.authorities[0]);
+    const dns::ARecord& resource = std::get<dns::ARecord>(decoded.resources[0]);
+
+    EXPECT_EQ(answer.domain, "example.com");
+    EXPECT_EQ(answer.addr, (std::array<std::uint8_t, 4>{1, 2, 3, 4}));
+    EXPECT_EQ(answer.ttl, 300u);
+
+    EXPECT_EQ(authority.domain, "ns.example.com");
+    EXPECT_EQ(authority.addr, (std::array<std::uint8_t, 4>{5, 6, 7, 8}));
+    EXPECT_EQ(authority.ttl, 400u);
+
+    EXPECT_EQ(resource.domain, "cache.example.com");
+    EXPECT_EQ(resource.addr, (std::array<std::uint8_t, 4>{9, 10, 11, 12}));
+    EXPECT_EQ(resource.ttl, 500u);
+}
+
+TEST(DnsPacketWriteTest, WriteSkipsUnknownRecordsWhenSettingCounts)
+{
+    dns::DnsPacket packet{};
+    dns::PacketBuffer buffer{};
+
+    packet.answers.push_back(dns::DnsRecord{dns::UnknownRecord{
+        .domain = "ignored.example.com", .qtype = 99, .data_len = 10, .ttl = 111}});
+
+    packet.answers.push_back(dns::DnsRecord{
+        dns::ARecord{.domain = "kept.example.com", .addr = {8, 8, 8, 8}, .ttl = 222}});
+
+    packet.write_to_buffer(buffer); // use packet.write(buffer) if that is your name
+
+    ASSERT_TRUE(buffer.ok());
+
+    // ancount should be 1, not 2
+    EXPECT_EQ(buffer.get(6), 0x00);
+    EXPECT_EQ(buffer.get(7), 0x01);
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    dns::DnsPacket decoded{};
+    decoded.decode_from_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(decoded.answers.size(), 1u);
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.answers[0]));
+
+    const dns::ARecord& answer = std::get<dns::ARecord>(decoded.answers[0]);
+    EXPECT_EQ(answer.domain, "kept.example.com");
+    EXPECT_EQ(answer.addr, (std::array<std::uint8_t, 4>{8, 8, 8, 8}));
+    EXPECT_EQ(answer.ttl, 222u);
 }
