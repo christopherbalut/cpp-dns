@@ -283,9 +283,9 @@ TEST(DnsPacketTest, DecodeClearsPreviousStateBeforeReadingNewPacket)
 {
     DnsPacket packet{};
     packet.header.id = 9999;
-    packet.questions.push_back(DnsQuestion{"stale", QueryType::A});
-    packet.answers.push_back(ARecord{.domain = "stale", .addr = {1, 1, 1, 1}, .ttl = 1});
-    packet.authorities.push_back(
+    packet.questions.emplace_back("stale", QueryType::A);
+    packet.answers.emplace_back(ARecord{.domain = "stale", .addr = {1, 1, 1, 1}, .ttl = 1});
+    packet.authorities.emplace_back(
         UnknownRecord{.domain = "stale", .qtype = 15, .data_len = 2, .ttl = 10});
     packet.resources.push_back(ARecord{.domain = "stale", .addr = {9, 9, 9, 9}, .ttl = 9});
 
@@ -336,8 +336,8 @@ TEST(DnsPacketTest, DecodeWorksFromNonZeroBufferOffset)
 TEST(DnsPacketTest, TruncatedHeaderStillResetsPacketAndDoesNotLeaveStaleSections)
 {
     DnsPacket packet{};
-    packet.questions.push_back(DnsQuestion{"old", QueryType::A});
-    packet.answers.push_back(ARecord{.domain = "old", .addr = {1, 1, 1, 1}, .ttl = 1});
+    packet.questions.emplace_back("old", QueryType::A);
+    packet.answers.emplace_back(ARecord{.domain = "old", .addr = {1, 1, 1, 1}, .ttl = 1});
 
     PacketBuffer buffer{};
     std::size_t pos = 0;
@@ -453,16 +453,16 @@ TEST(DnsPacketWriteTest, WriteThenDecodeRepresentativePacketRoundTrip)
     written.header.id = 0xBEEF;
     written.header.recursion_desired = true;
 
-    written.questions.push_back(dns::DnsQuestion{"example.com", dns::QueryType::A});
+    written.questions.emplace_back("example.com", dns::QueryType::A);
 
-    written.answers.push_back(
-        dns::DnsRecord{dns::ARecord{.domain = "example.com", .addr = {1, 2, 3, 4}, .ttl = 300}});
+    written.answers.emplace_back(
+        dns::ARecord{.domain = "example.com", .addr = {1, 2, 3, 4}, .ttl = 300});
 
-    written.authorities.push_back(
-        dns::DnsRecord{dns::ARecord{.domain = "ns.example.com", .addr = {5, 6, 7, 8}, .ttl = 400}});
+    written.authorities.emplace_back(
+        dns::ARecord{.domain = "ns.example.com", .addr = {5, 6, 7, 8}, .ttl = 400});
 
-    written.resources.push_back(dns::DnsRecord{
-        dns::ARecord{.domain = "cache.example.com", .addr = {9, 10, 11, 12}, .ttl = 500}});
+    written.resources.emplace_back(
+        dns::ARecord{.domain = "cache.example.com", .addr = {9, 10, 11, 12}, .ttl = 500});
 
     written.write_to_buffer(buffer); // use packet.write(buffer) if that is your name
 
@@ -513,11 +513,11 @@ TEST(DnsPacketWriteTest, WriteSkipsUnknownRecordsWhenSettingCounts)
     dns::DnsPacket packet{};
     dns::PacketBuffer buffer{};
 
-    packet.answers.push_back(dns::DnsRecord{dns::UnknownRecord{
-        .domain = "ignored.example.com", .qtype = 99, .data_len = 10, .ttl = 111}});
+    packet.answers.emplace_back(dns::UnknownRecord{
+        .domain = "ignored.example.com", .qtype = 99, .data_len = 10, .ttl = 111});
 
-    packet.answers.push_back(dns::DnsRecord{
-        dns::ARecord{.domain = "kept.example.com", .addr = {8, 8, 8, 8}, .ttl = 222}});
+    packet.answers.emplace_back(
+        dns::ARecord{.domain = "kept.example.com", .addr = {8, 8, 8, 8}, .ttl = 222});
 
     packet.write_to_buffer(buffer); // use packet.write(buffer) if that is your name
 
