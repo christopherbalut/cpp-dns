@@ -5,12 +5,18 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <variant>
+
+#include <arpa/inet.h>  // inet_pton()
+#include <netinet/in.h> // sockaddr_in, htons()
+#include <sys/socket.h> // socket(), AF_INET, SOCK_DGRAM
+#include <unistd.h>     // close()
 
 namespace
 {
@@ -125,35 +131,38 @@ void print_packet(const dns::DnsPacket& packet)
 
 int main()
 {
-    try
-    {
-        // create empty packetbuffer
-        // open the file
-        // read the file into temporary storage
-        //
-        // for each byte read from the file:
-        // write that byte into packetbuffer using set(index, byte)
-        //
-        // reset packetbuffer cursor to begining
-        // create Empty DnsPacket
-        // decode the packet from packetbuffer
-        // print the header
-        // print each question
-        // print each answer
-        // print each authoriy asnwer
-        // print each resource used
-        dns::PacketBuffer buffer{};
-        load_file_into_packet_buffer("response_packet.txt", buffer);
+    // create DNS Packet and fill header
+    dns::DnsPacket packet{}; // create empty dns packet
+    packet.header.id = 6666;
+    packet.header.questions = 1;
+    packet.header.recursion_desired = true;
 
-        dns::DnsPacket packet{};
-        packet.decode_from_buffer(buffer);
+    dns::DnsQuestion question{};
+    question.name = "google.com";
+    question.qtype = dns::QueryType::A;
 
-        print_packet(packet);
-    }
-    catch (const std::exception& exception)
+    packet.questions.emplace_back(question);
+    packet.header.questions = static_cast<std::uint16_t>(packet.questions.size());
+
+    // write packet into PacketBuffer
+    dns::PacketBuffer request_buffer{};
+    packet.write_to_buffer(request_buffer);
+
+    // send buffer through UDP socket
+    int socketfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socketfd < 0)
     {
-        std::cerr << "error code: " << exception.what() << '\n';
+        std::cerr << "socket() failed: " << std::strerror(errno) << '\n';
         return 1;
     }
+
+    sockaddr_in server_address{};
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(53);
+
+    // receive response bytes
+
+    // decode into dns packet
+
     return 0;
 }
