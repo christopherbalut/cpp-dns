@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <span>
 #include <string>
 
@@ -51,6 +52,12 @@ class PacketBuffer
     [[nodiscard]] bool ok() const;
     [[nodiscard]] BufferError last_error() const;
     void clear_error();
+
+    [[nodiscard]] const std::uint8_t* data() const;
+    [[nodiscard]] std::uint8_t* data();
+
+    void set_size(std::size_t size);
+    [[nodiscard]] std::size_t size() const;
 
   private:
     [[nodiscard]] bool can_write(std::size_t byte_count) const;

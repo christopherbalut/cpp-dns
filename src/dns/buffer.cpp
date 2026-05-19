@@ -433,4 +433,29 @@ void PacketBuffer::write_qname(std::string_view qname)
     update_size_after_write();
 }
 
+const std::uint8_t* PacketBuffer::data() const
+{
+    return buffer_.data();
+}
+
+std::uint8_t* PacketBuffer::data()
+{
+    return buffer_.data();
+}
+
+void PacketBuffer::set_size(std::size_t size)
+{
+    if (size > max_size)
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    size_ = size;
+}
+
+std::size_t PacketBuffer::size() const
+{
+    return size_;
+}
 } // namespace dns
