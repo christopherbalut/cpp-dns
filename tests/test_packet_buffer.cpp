@@ -699,3 +699,46 @@ TEST(PacketBufferQNameTests, WriteQNameSucceedsWhenRemainingSpaceExactlyMatchesA
     EXPECT_EQ(buffer.position(), packet_buffer_capacity);
     expect_bytes_at(buffer, packet_buffer_capacity - 5, {1, u8('a'), 1, u8('b'), 0});
 }
+
+TEST(PacketBufferTest, DataReturnsPointerToWrittenBytes)
+{
+    dns::PacketBuffer buffer{};
+
+    buffer.write_u8(0xAB);
+
+    ASSERT_TRUE(buffer.ok());
+    ASSERT_NE(buffer.data(), nullptr);
+    EXPECT_EQ(buffer.data()[0], 0xAB);
+}
+
+TEST(PacketBufferTest, SetSizeUpdatesSizeButKeepsPosition)
+{
+    dns::PacketBuffer buffer{};
+
+    buffer.set_size(44);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.size(), 44);
+    EXPECT_EQ(buffer.position(), 0);
+}
+
+TEST(PacketBufferTest, SetSizeAllowsMaxSize)
+{
+    dns::PacketBuffer buffer{};
+
+    buffer.set_size(dns::PacketBuffer::max_size);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.size(), dns::PacketBuffer::max_size);
+}
+
+TEST(PacketBufferTest, SetSizeRejectsTooLargeSize)
+{
+    dns::PacketBuffer buffer{};
+
+    buffer.set_size(dns::PacketBuffer::max_size + 1);
+
+    EXPECT_FALSE(buffer.ok());
+    EXPECT_EQ(buffer.last_error(), dns::BufferError::end_of_buffer);
+    EXPECT_EQ(buffer.size(), 0);
+}

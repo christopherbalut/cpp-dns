@@ -14,6 +14,7 @@ add_library(cpp_dns
     src/dns/packet.cpp
     src/dns/question.cpp
     src/dns/record.cpp
+    src/dns/stub_resolver.cpp
 )
 
 target_include_directories(cpp_dns
@@ -53,6 +54,7 @@ if (BUILD_TESTING)
     include(GoogleTest)
 
     add_executable(dns_tests
+        tests/test_dns_stub_resolver.cpp
         tests/test_dns_header.cpp
         tests/test_dns_packet.cpp
         tests/test_dns_question.cpp

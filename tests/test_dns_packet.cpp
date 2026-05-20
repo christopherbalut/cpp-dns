@@ -542,3 +542,47 @@ TEST(DnsPacketWriteTest, WriteSkipsUnknownRecordsWhenSettingCounts)
     EXPECT_EQ(answer.addr, (std::array<std::uint8_t, 4>{8, 8, 8, 8}));
     EXPECT_EQ(answer.ttl, 222u);
 }
+
+TEST(DnsPacketTest, DecodeGoogleAResponseFromRawBytes)
+{
+    const std::array<std::uint8_t, 44> raw_response{
+        0x1a, 0x0a, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x06, 0x67, 0x6f,
+        0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c,
+        0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x8a, 0x00, 0x04, 0x8e, 0xfa, 0x45, 0x2e};
+
+    dns::PacketBuffer buffer{};
+    std::copy(raw_response.begin(), raw_response.end(), buffer.data());
+
+    buffer.set_size(raw_response.size());
+    buffer.seek(0);
+
+    dns::DnsPacket packet{};
+    packet.decode_from_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    EXPECT_EQ(packet.header.id, 6666);
+    EXPECT_TRUE(packet.header.response);
+    EXPECT_TRUE(packet.header.recursion_desired);
+    EXPECT_TRUE(packet.header.recursion_available);
+    EXPECT_EQ(packet.header.questions, 1);
+    EXPECT_EQ(packet.header.answers, 1);
+    EXPECT_EQ(packet.header.authoritative_entries, 0);
+    EXPECT_EQ(packet.header.resource_entries, 0);
+
+    ASSERT_EQ(packet.questions.size(), 1);
+    EXPECT_EQ(packet.questions[0].name, "google.com");
+    EXPECT_EQ(packet.questions[0].qtype, dns::QueryType::A);
+
+    ASSERT_EQ(packet.answers.size(), 1);
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(packet.answers[0]));
+
+    const auto& answer = std::get<dns::ARecord>(packet.answers[0]);
+
+    EXPECT_EQ(answer.domain, "google.com");
+    EXPECT_EQ(answer.ttl, 138);
+    EXPECT_EQ(answer.addr[0], 142);
+    EXPECT_EQ(answer.addr[1], 250);
+    EXPECT_EQ(answer.addr[2], 69);
+    EXPECT_EQ(answer.addr[3], 46);
+}
