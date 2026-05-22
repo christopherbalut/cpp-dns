@@ -101,7 +101,7 @@ int main()
     try
     {
         dns::StubResolver resolver{};
-        dns::DnsPacket response_packet = resolver.lookup("google.com", dns::QueryType::A);
+        dns::DnsPacket response_packet = resolver.lookup("www.yahoo.com", dns::QueryType::A);
 
         print_header(response_packet.header);
 

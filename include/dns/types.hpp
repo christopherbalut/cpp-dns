@@ -35,10 +35,14 @@ constexpr ResultCode to_result_code(std::uint8_t code)
     }
 }
 
-enum class QueryType : std::uint16_t
+enum class QueryType : std::uint8_t
 {
     Unknown = 0,
-    A = 1
+    A = 1,
+    NS = 2,
+    CNAME = 5,
+    MX = 15,
+    AAAA = 28
 };
 
 constexpr std::uint16_t to_code(QueryType type)
@@ -47,6 +51,14 @@ constexpr std::uint16_t to_code(QueryType type)
     {
         case QueryType::A:
             return 1;
+        case QueryType::NS:
+            return 2;
+        case QueryType::CNAME:
+            return 5;
+        case QueryType::MX:
+            return 15;
+        case QueryType::AAAA:
+            return 28;
         case QueryType::Unknown:
         default:
             return 0;
@@ -59,6 +71,14 @@ constexpr QueryType to_query_type(std::uint16_t code)
     {
         case 1:
             return QueryType::A;
+        case 2:
+            return QueryType::NS;
+        case 5:
+            return QueryType::CNAME;
+        case 15:
+            return QueryType::MX;
+        case 28:
+            return QueryType::AAAA;
         default:
             return QueryType::Unknown;
     }
