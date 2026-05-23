@@ -14,6 +14,11 @@ PacketBuffer::PacketBuffer() = default;
 
 void PacketBuffer::set(std::size_t pos, std::uint8_t value)
 {
+    if (!ok())
+    {
+        return;
+    }
+
     if (pos >= max_size)
     {
         last_error_ = BufferError::position_out_of_bounds;
@@ -23,13 +28,32 @@ void PacketBuffer::set(std::size_t pos, std::uint8_t value)
     buffer_[pos] = value;
 
     size_ = std::max(pos + 1, size_);
-
-    last_error_ = BufferError::none;
 }
 
 std::size_t PacketBuffer::position() const
 {
     return position_;
+}
+
+void PacketBuffer::set_u16(std::size_t pos, std::uint16_t value)
+{
+    if (!ok())
+    {
+        return;
+    }
+
+    if (pos >= max_size || pos + 1 >= max_size)
+    {
+        last_error_ = BufferError::position_out_of_bounds;
+        return;
+    }
+    set(pos, static_cast<std::uint8_t>((value >> 8) * 0xFF));
+    if (!ok())
+    {
+        return;
+    }
+
+    set(pos + 1, static_cast<std::uint8_t>(value & 0xFF));
 }
 
 void PacketBuffer::step(std::size_t steps)
