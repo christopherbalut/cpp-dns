@@ -47,7 +47,7 @@ void PacketBuffer::set_u16(std::size_t pos, std::uint16_t value)
         last_error_ = BufferError::position_out_of_bounds;
         return;
     }
-    set(pos, static_cast<std::uint8_t>((value >> 8) * 0xFF));
+    set(pos, static_cast<std::uint8_t>((value >> 8) & 0xFF));
     if (!ok())
     {
         return;

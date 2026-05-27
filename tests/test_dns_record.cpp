@@ -148,6 +148,27 @@ std::size_t write_compressed_a_record(PacketBuffer& buffer, std::size_t pos,
     return pos;
 }
 } // namespace
+  //
+
+namespace
+{
+
+dns::DnsRecord round_trip_record(const dns::DnsRecord& record)
+{
+    dns::PacketBuffer buffer{};
+
+    const std::size_t bytes_written = dns::write_record(record, buffer);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_GT(bytes_written, 0);
+
+    buffer.seek(0);
+    EXPECT_TRUE(buffer.ok());
+
+    return dns::decode_record(buffer);
+}
+
+} // namespace
 
 TEST(DnsRecordTest, DecodeARecordSingleLabel)
 {
@@ -431,4 +452,99 @@ TEST(DnsRecordWriteTest, WriteUnknownRecordWritesNothing)
     ASSERT_TRUE(buffer.ok());
     EXPECT_EQ(bytes_written, 0u);
     EXPECT_EQ(buffer.position(), 0u);
+}
+
+TEST(DnsRecordChapter3Tests, CNameRecordRoundTrips)
+{
+    const dns::DnsRecord record = dns::CNameRecord{
+        .domain = "www.yahoo.com",
+        .host = "me-ycpi-cf-www.g06.yahoodns.net",
+        .ttl = 37,
+    };
+
+    const dns::DnsRecord decoded = round_trip_record(record);
+
+    ASSERT_TRUE(std::holds_alternative<dns::CNameRecord>(decoded));
+
+    const auto& cname = std::get<dns::CNameRecord>(decoded);
+
+    EXPECT_EQ(cname.domain, "www.yahoo.com");
+    EXPECT_EQ(cname.host, "me-ycpi-cf-www.g06.yahoodns.net");
+    EXPECT_EQ(cname.ttl, 37);
+}
+
+TEST(DnsRecordChapter3Tests, NSRecordRoundTrips)
+{
+    const dns::DnsRecord record = dns::NSRecord{
+        .domain = "example.com",
+        .host = "a.iana-servers.net",
+        .ttl = 300,
+    };
+
+    const dns::DnsRecord decoded = round_trip_record(record);
+
+    ASSERT_TRUE(std::holds_alternative<dns::NSRecord>(decoded));
+
+    const auto& ns = std::get<dns::NSRecord>(decoded);
+
+    EXPECT_EQ(ns.domain, "example.com");
+    EXPECT_EQ(ns.host, "a.iana-servers.net");
+    EXPECT_EQ(ns.ttl, 300);
+}
+
+TEST(DnsRecordChapter3Tests, MXRecordRoundTrips)
+{
+    const dns::DnsRecord record = dns::MXRecord{
+        .domain = "example.com",
+        .priority = 10,
+        .host = "mail.example.com",
+        .ttl = 600,
+    };
+
+    const dns::DnsRecord decoded = round_trip_record(record);
+
+    ASSERT_TRUE(std::holds_alternative<dns::MXRecord>(decoded));
+
+    const auto& mx = std::get<dns::MXRecord>(decoded);
+
+    EXPECT_EQ(mx.domain, "example.com");
+    EXPECT_EQ(mx.priority, 10);
+    EXPECT_EQ(mx.host, "mail.example.com");
+    EXPECT_EQ(mx.ttl, 600);
+}
+
+TEST(DnsRecordChapter3Tests, AAAARecordRoundTrips)
+{
+    const dns::DnsRecord record = dns::AAAARecord{
+        .domain = "example.com",
+        .addr =
+            std::array<std::uint16_t, 8>{
+                0x2606,
+                0x2800,
+                0x0220,
+                0x0001,
+                0x0248,
+                0x1893,
+                0x25c8,
+                0x1946,
+            },
+        .ttl = 120,
+    };
+
+    const dns::DnsRecord decoded = round_trip_record(record);
+
+    ASSERT_TRUE(std::holds_alternative<dns::AAAARecord>(decoded));
+
+    const auto& aaaa = std::get<dns::AAAARecord>(decoded);
+
+    EXPECT_EQ(aaaa.domain, "example.com");
+    EXPECT_EQ(aaaa.addr[0], 0x2606);
+    EXPECT_EQ(aaaa.addr[1], 0x2800);
+    EXPECT_EQ(aaaa.addr[2], 0x0220);
+    EXPECT_EQ(aaaa.addr[3], 0x0001);
+    EXPECT_EQ(aaaa.addr[4], 0x0248);
+    EXPECT_EQ(aaaa.addr[5], 0x1893);
+    EXPECT_EQ(aaaa.addr[6], 0x25c8);
+    EXPECT_EQ(aaaa.addr[7], 0x1946);
+    EXPECT_EQ(aaaa.ttl, 120);
 }

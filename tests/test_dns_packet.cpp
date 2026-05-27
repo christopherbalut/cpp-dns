@@ -244,7 +244,7 @@ TEST(DnsPacketTest, DecodeAllSectionsPreservesCountsOrderAndContents)
     EXPECT_EQ(packet.questions[0].name, "");
     EXPECT_EQ(packet.questions[0].qtype, QueryType::A);
     EXPECT_EQ(packet.questions[1].name, "");
-    EXPECT_EQ(packet.questions[1].qtype, QueryType::Unknown);
+    EXPECT_EQ(packet.questions[1].qtype, QueryType::AAAA);
 
     ASSERT_EQ(packet.answers.size(), 2U);
     ASSERT_TRUE(std::holds_alternative<ARecord>(packet.answers[0]));

@@ -32,6 +32,14 @@ std::string query_type_string(dns::QueryType qtype)
     {
         case dns::QueryType::A:
             return "A";
+        case dns::QueryType::NS:
+            return "NS";
+        case dns::QueryType::CNAME:
+            return "CNAME";
+        case dns::QueryType::MX:
+            return "MX";
+        case dns::QueryType::AAAA:
+            return "AAAA";
         default:
             return "UNKNOWN";
     }
@@ -80,6 +88,51 @@ void print_record(const dns::DnsRecord& record)
                 std::cout << "    addr: " << static_cast<int>(rec.addr[0]) << "."
                           << static_cast<int>(rec.addr[1]) << "." << static_cast<int>(rec.addr[2])
                           << "." << static_cast<int>(rec.addr[3]) << ",\n";
+                std::cout << "    ttl: " << rec.ttl << "\n";
+                std::cout << "}\n";
+            }
+            else if constexpr (std::is_same_v<T, dns::NSRecord>)
+            {
+                std::cout << "NS {\n";
+                std::cout << "    domain: \"" << rec.domain << "\",\n";
+                std::cout << "    host: \"" << rec.host << "\",\n";
+                std::cout << "    ttl: " << rec.ttl << "\n";
+                std::cout << "}\n";
+            }
+            else if constexpr (std::is_same_v<T, dns::CNameRecord>)
+            {
+                std::cout << "CNAME {\n";
+                std::cout << "    domain: \"" << rec.domain << "\",\n";
+                std::cout << "    host: \"" << rec.host << "\",\n";
+                std::cout << "    ttl: " << rec.ttl << "\n";
+                std::cout << "}\n";
+            }
+            else if constexpr (std::is_same_v<T, dns::MXRecord>)
+            {
+                std::cout << "MX {\n";
+                std::cout << "    domain: \"" << rec.domain << "\",\n";
+                std::cout << "    priority: " << rec.priority << ",\n";
+                std::cout << "    host: \"" << rec.host << "\",\n";
+                std::cout << "    ttl: " << rec.ttl << "\n";
+                std::cout << "}\n";
+            }
+            else if constexpr (std::is_same_v<T, dns::AAAARecord>)
+            {
+                std::cout << "AAAA {\n";
+                std::cout << "    domain: \"" << rec.domain << "\",\n";
+                std::cout << "    addr: ";
+
+                for (std::size_t i = 0; i < rec.addr.size(); ++i)
+                {
+                    if (i != 0)
+                    {
+                        std::cout << ":";
+                    }
+
+                    std::cout << std::hex << rec.addr[i];
+                }
+
+                std::cout << std::dec << ",\n";
                 std::cout << "    ttl: " << rec.ttl << "\n";
                 std::cout << "}\n";
             }

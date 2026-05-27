@@ -742,3 +742,19 @@ TEST(PacketBufferTest, SetSizeRejectsTooLargeSize)
     EXPECT_EQ(buffer.last_error(), dns::BufferError::end_of_buffer);
     EXPECT_EQ(buffer.size(), 0);
 }
+
+TEST(PacketBufferTests, SetU16WritesNetworkByteOrder)
+{
+    dns::PacketBuffer buffer{};
+
+    buffer.set_u16(0, 0x1234);
+
+    ASSERT_TRUE(buffer.ok());
+    ASSERT_EQ(buffer.size(), 2);
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    EXPECT_EQ(buffer.read_u16(), 0x1234);
+    EXPECT_TRUE(buffer.ok());
+}

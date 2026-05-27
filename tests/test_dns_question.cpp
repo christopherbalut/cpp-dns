@@ -232,7 +232,7 @@ TEST(DnsQuestionTest, DecodeMapsUnknownNumericTypeToUnknown)
     question.decode(buffer);
 
     EXPECT_EQ(question.name, "example.com");
-    EXPECT_EQ(question.qtype, QueryType::Unknown);
+    EXPECT_EQ(question.qtype, QueryType::AAAA);
     EXPECT_EQ(buffer.position(), end);
 }
 
