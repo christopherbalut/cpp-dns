@@ -46,39 +46,36 @@ std::string query_type_string(dns::QueryType qtype)
     }
 }
 
-std::ostream& operator<<(std::ostream& os, const dns::DnsQuestion& question)
+void print_question(const dns::DnsQuestion& question)
 {
-    os << "DnsQuestion {\n";
-    os << "    name: \"" << question.name << "\",\n";
-    os << "    qtype: " << query_type_string(question.qtype) << '\n';
-    os << "}\n";
-    return os;
+    std::cout << "DnsQuestion {\n";
+    std::cout << "    name: \"" << question.name << "\",\n";
+    std::cout << "    qtype: " << query_type_string(question.qtype) << '\n';
+    std::cout << "}\n";
 }
 
-std::ostream& operator<<(std::ostream& os, const dns::DnsHeader& header)
+void print_header(const dns::DnsHeader& header)
 {
-    os << "DnsHeader {\n";
-    os << "    id: " << header.id << ",\n";
-    os << "    recursion_desired: " << bool_string(header.recursion_desired) << ",\n";
-    os << "    truncated_message: " << bool_string(header.truncated_message) << ",\n";
-    os << "    authoritative_answer: " << bool_string(header.authoritative_answer) << ",\n";
-    os << "    opcode: " << static_cast<int>(header.opcode) << ",\n";
-    os << "    response: " << bool_string(header.response) << ",\n";
-    os << "    rescode: " << static_cast<int>(header.rescode) << ",\n";
-    os << "    checking_disabled: " << bool_string(header.checking_disabled) << ",\n";
-    os << "    authed_data: " << bool_string(header.authed_data) << ",\n";
-    os << "    z: " << bool_string(header.z) << ",\n";
-    os << "    recursion_available: " << bool_string(header.recursion_available) << ",\n";
-    os << "    questions: " << header.questions << ",\n";
-    os << "    answers: " << header.answers << ",\n";
-    os << "    authoritative_entries: " << header.authoritative_entries << ",\n";
-    os << "    resource_entries: " << header.resource_entries << "\n";
-    os << "}\n";
-
-    return os;
+    std::cout << "DnsHeader {\n";
+    std::cout << "    id: " << header.id << ",\n";
+    std::cout << "    recursion_desired: " << bool_string(header.recursion_desired) << ",\n";
+    std::cout << "    truncated_message: " << bool_string(header.truncated_message) << ",\n";
+    std::cout << "    authoritative_answer: " << bool_string(header.authoritative_answer) << ",\n";
+    std::cout << "    opcode: " << static_cast<int>(header.opcode) << ",\n";
+    std::cout << "    response: " << bool_string(header.response) << ",\n";
+    std::cout << "    rescode: " << static_cast<int>(header.rescode) << ",\n";
+    std::cout << "    checking_disabled: " << bool_string(header.checking_disabled) << ",\n";
+    std::cout << "    authed_data: " << bool_string(header.authed_data) << ",\n";
+    std::cout << "    z: " << bool_string(header.z) << ",\n";
+    std::cout << "    recursion_available: " << bool_string(header.recursion_available) << ",\n";
+    std::cout << "    questions: " << header.questions << ",\n";
+    std::cout << "    answers: " << header.answers << ",\n";
+    std::cout << "    authoritative_entries: " << header.authoritative_entries << ",\n";
+    std::cout << "    resource_entries: " << header.resource_entries << "\n";
+    std::cout << "}\n";
 }
 
-std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record)
+std::ostream& operator<<(std::ostream& os, dns::DnsRecord& record)
 {
     std::visit(
         [&os](const auto& rec)
@@ -161,26 +158,26 @@ int main()
         dns::StubResolver resolver{};
         dns::DnsPacket response_packet = resolver.lookup("www.yahoo.com", dns::QueryType::A);
 
-        std::cout << (response_packet.header);
+        print_header(response_packet.header);
 
         for (const auto& question : response_packet.questions)
         {
-            std::cout << (question);
+            print_question(question);
         }
 
         for (const auto& record : response_packet.answers)
         {
-            std::cout << record;
+            print_record(record);
         }
 
         for (const auto& record : response_packet.authorities)
         {
-            std::cout << record;
+            print_record(record);
         }
 
         for (const auto& record : response_packet.resources)
         {
-            std::cout << record;
+            print_record(record);
         }
     }
     catch (const std::exception& error)
