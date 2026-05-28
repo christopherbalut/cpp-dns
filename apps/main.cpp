@@ -46,6 +46,13 @@ std::string query_type_string(dns::QueryType qtype)
     }
 }
 
+template <typename... Ts> struct Overloaded : Ts...
+{
+    using Ts::operator()...;
+};
+
+template <typename... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
+
 std::ostream& operator<<(std::ostream& os, const dns::DnsQuestion& question)
 {
     os << "DnsQuestion {\n";
@@ -81,11 +88,8 @@ std::ostream& operator<<(std::ostream& os, const dns::DnsHeader& header)
 std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record)
 {
     std::visit(
-        [&os](const auto& rec)
-        {
-            using T = std::decay_t<decltype(rec)>;
-
-            if constexpr (std::is_same_v<T, dns::ARecord>)
+        Overloaded{
+            [&os](const dns::ARecord& rec)
             {
                 os << "A {\n";
                 os << "    domain: \"" << rec.domain << "\",\n";
@@ -94,24 +98,27 @@ std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record)
                    << static_cast<int>(rec.addr[3]) << ",\n";
                 os << "    ttl: " << rec.ttl << "\n";
                 os << "}\n";
-            }
-            else if constexpr (std::is_same_v<T, dns::NSRecord>)
+            },
+
+            [&os](const dns::NSRecord& rec)
             {
                 os << "NS {\n";
                 os << "    domain: \"" << rec.domain << "\",\n";
                 os << "    host: \"" << rec.host << "\",\n";
                 os << "    ttl: " << rec.ttl << "\n";
                 os << "}\n";
-            }
-            else if constexpr (std::is_same_v<T, dns::CNameRecord>)
+            },
+
+            [&os](const dns::CNameRecord& rec)
             {
                 os << "CNAME {\n";
                 os << "    domain: \"" << rec.domain << "\",\n";
                 os << "    host: \"" << rec.host << "\",\n";
                 os << "    ttl: " << rec.ttl << "\n";
                 os << "}\n";
-            }
-            else if constexpr (std::is_same_v<T, dns::MXRecord>)
+            },
+
+            [&os](const dns::MXRecord& rec)
             {
                 os << "MX {\n";
                 os << "    domain: \"" << rec.domain << "\",\n";
@@ -119,8 +126,9 @@ std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record)
                 os << "    host: \"" << rec.host << "\",\n";
                 os << "    ttl: " << rec.ttl << "\n";
                 os << "}\n";
-            }
-            else if constexpr (std::is_same_v<T, dns::AAAARecord>)
+            },
+
+            [&os](const dns::AAAARecord& rec)
             {
                 os << "AAAA {\n";
                 os << "    domain: \"" << rec.domain << "\",\n";
@@ -139,8 +147,9 @@ std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record)
                 os << std::dec << ",\n";
                 os << "    ttl: " << rec.ttl << "\n";
                 os << "}\n";
-            }
-            else if constexpr (std::is_same_v<T, dns::UnknownRecord>)
+            },
+
+            [&os](const dns::UnknownRecord& rec)
             {
                 os << "UNKNOWN {\n";
                 os << "    domain: \"" << rec.domain << "\",\n";
@@ -148,7 +157,7 @@ std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record)
                 os << "    ttl: " << rec.ttl << ",\n";
                 os << "    data_len: " << rec.data_len << "\n";
                 os << "}\n";
-            }
+            },
         },
         record);
     return os;
