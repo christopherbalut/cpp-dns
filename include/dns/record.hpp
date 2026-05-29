@@ -66,4 +66,6 @@ DnsRecord decode_record(PacketBuffer& buffer);
 std::size_t write_record(
     const DnsRecord& record,
     PacketBuffer& buffer); // take as input an in-memory DNS record, serialize it and write it
+
+std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record);
 } // namespace dns

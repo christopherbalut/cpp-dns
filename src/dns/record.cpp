@@ -3,6 +3,7 @@
 #include "dns/question.hpp"
 #include "dns/types.hpp"
 #include <array>
+#include <ostream>
 #include <type_traits>
 #include <variant>
 
@@ -385,5 +386,90 @@ std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
         record);
 
     return buffer.position() - start_position;
+}
+
+template <typename... Ts> struct Overloaded : Ts...
+{
+    using Ts::operator()...;
+};
+
+template <typename... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
+
+std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record)
+{
+    std::visit(
+        Overloaded{
+            [&os](const dns::ARecord& rec)
+            {
+                os << "A {\n";
+                os << "    domain: \"" << rec.domain << "\",\n";
+                os << "    addr: " << static_cast<int>(rec.addr[0]) << "."
+                   << static_cast<int>(rec.addr[1]) << "." << static_cast<int>(rec.addr[2]) << "."
+                   << static_cast<int>(rec.addr[3]) << ",\n";
+                os << "    ttl: " << rec.ttl << "\n";
+                os << "}\n";
+            },
+
+            [&os](const dns::NSRecord& rec)
+            {
+                os << "NS {\n";
+                os << "    domain: \"" << rec.domain << "\",\n";
+                os << "    host: \"" << rec.host << "\",\n";
+                os << "    ttl: " << rec.ttl << "\n";
+                os << "}\n";
+            },
+
+            [&os](const dns::CNameRecord& rec)
+            {
+                os << "CNAME {\n";
+                os << "    domain: \"" << rec.domain << "\",\n";
+                os << "    host: \"" << rec.host << "\",\n";
+                os << "    ttl: " << rec.ttl << "\n";
+                os << "}\n";
+            },
+
+            [&os](const dns::MXRecord& rec)
+            {
+                os << "MX {\n";
+                os << "    domain: \"" << rec.domain << "\",\n";
+                os << "    priority: " << rec.priority << ",\n";
+                os << "    host: \"" << rec.host << "\",\n";
+                os << "    ttl: " << rec.ttl << "\n";
+                os << "}\n";
+            },
+
+            [&os](const dns::AAAARecord& rec)
+            {
+                os << "AAAA {\n";
+                os << "    domain: \"" << rec.domain << "\",\n";
+                os << "    addr: ";
+
+                for (std::size_t i = 0; i < rec.addr.size(); ++i)
+                {
+                    if (i != 0)
+                    {
+                        os << ":";
+                    }
+
+                    os << std::hex << rec.addr[i];
+                }
+
+                os << std::dec << ",\n";
+                os << "    ttl: " << rec.ttl << "\n";
+                os << "}\n";
+            },
+
+            [&os](const dns::UnknownRecord& rec)
+            {
+                os << "UNKNOWN {\n";
+                os << "    domain: \"" << rec.domain << "\",\n";
+                os << "    qtype: " << static_cast<int>(rec.qtype) << ",\n";
+                os << "    ttl: " << rec.ttl << ",\n";
+                os << "    data_len: " << rec.data_len << "\n";
+                os << "}\n";
+            },
+        },
+        record);
+    return os;
 }
 }; // namespace dns
