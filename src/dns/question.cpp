@@ -1,6 +1,7 @@
 #include "dns/question.hpp"
 #include "dns/buffer.hpp"
 #include "dns/types.hpp"
+#include <ostream>
 #include <utility>
 
 namespace dns
@@ -68,5 +69,15 @@ void DnsQuestion::write(PacketBuffer& buffer) const
     {
         return;
     }
+}
+
+std::ostream& operator<<(std::ostream& os, const DnsQuestion& question)
+{
+    os << "DnsQuestion {\n";
+    os << "    name: \"" << question.name << "\",\n";
+    os << "    qtype: " << to_string(question.qtype) << '\n';
+    os << "}\n";
+
+    return os;
 }
 }; // namespace dns
