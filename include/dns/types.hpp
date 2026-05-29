@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 
 namespace dns
 {
@@ -81,6 +82,26 @@ constexpr QueryType to_query_type(std::uint16_t code)
             return QueryType::AAAA;
         default:
             return QueryType::Unknown;
+    }
+}
+
+constexpr std::string_view to_string(QueryType qtype)
+{
+    switch (qtype)
+    {
+        case QueryType::A:
+            return "A";
+        case QueryType::NS:
+            return "NS";
+        case QueryType::CNAME:
+            return "CNAME";
+        case QueryType::MX:
+            return "MX";
+        case QueryType::AAAA:
+            return "AAAA";
+        case QueryType::Unknown:
+        default:
+            return "UNKNOWN";
     }
 }
 
