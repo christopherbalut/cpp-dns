@@ -2,6 +2,7 @@
 #include "dns/buffer.hpp"
 #include "dns/types.hpp"
 #include <cstdint>
+#include <ostream>
 
 namespace dns
 {
@@ -19,6 +20,11 @@ constexpr std::uint8_t checking_disabled_bit = 4;
 constexpr std::uint8_t authed_data_bit = 5;
 constexpr std::uint8_t z_bit = 6;
 constexpr std::uint8_t recursion_available_bit = 7;
+
+const char* bool_string(bool value)
+{
+    return value ? "true" : "false";
+}
 } // namespace
 
 void DnsHeader::decode(PacketBuffer& buffer)
@@ -140,4 +146,26 @@ void DnsHeader::write(PacketBuffer& buffer) const
     buffer.write_u16(resource_entries);
 }
 
+std::ostream& operator<<(std::ostream& os, const dns::DnsHeader& header)
+{
+    os << "DnsHeader {\n";
+    os << "    id: " << header.id << ",\n";
+    os << "    recursion_desired: " << bool_string(header.recursion_desired) << ",\n";
+    os << "    truncated_message: " << bool_string(header.truncated_message) << ",\n";
+    os << "    authoritative_answer: " << bool_string(header.authoritative_answer) << ",\n";
+    os << "    opcode: " << static_cast<int>(header.opcode) << ",\n";
+    os << "    response: " << bool_string(header.response) << ",\n";
+    os << "    rescode: " << static_cast<int>(header.rescode) << ",\n";
+    os << "    checking_disabled: " << bool_string(header.checking_disabled) << ",\n";
+    os << "    authed_data: " << bool_string(header.authed_data) << ",\n";
+    os << "    z: " << bool_string(header.z) << ",\n";
+    os << "    recursion_available: " << bool_string(header.recursion_available) << ",\n";
+    os << "    questions: " << header.questions << ",\n";
+    os << "    answers: " << header.answers << ",\n";
+    os << "    authoritative_entries: " << header.authoritative_entries << ",\n";
+    os << "    resource_entries: " << header.resource_entries << "\n";
+    os << "}\n";
+
+    return os;
+}
 } // namespace dns

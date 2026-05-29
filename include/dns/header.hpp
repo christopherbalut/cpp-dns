@@ -33,4 +33,6 @@ struct DnsHeader // represents the first 12 bytes of the DnsPacket
     void write(PacketBuffer& buffer)
         const; // turn fields of in the header into bytes so they appear at the start of th
 };
+
+std::ostream& operator<<(std::ostream& os, const dns::DnsHeader& header);
 } // namespace dns
