@@ -4,9 +4,9 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace dns
 {
@@ -14,6 +14,11 @@ PacketBuffer::PacketBuffer() = default;
 
 void PacketBuffer::set(std::size_t pos, std::uint8_t value)
 {
+    if (!ok())
+    {
+        return;
+    }
+
     if (pos >= max_size)
     {
         last_error_ = BufferError::position_out_of_bounds;
@@ -23,8 +28,6 @@ void PacketBuffer::set(std::size_t pos, std::uint8_t value)
     buffer_[pos] = value;
 
     size_ = std::max(pos + 1, size_);
-
-    last_error_ = BufferError::none;
 }
 
 std::size_t PacketBuffer::position() const
@@ -32,11 +35,31 @@ std::size_t PacketBuffer::position() const
     return position_;
 }
 
+void PacketBuffer::set_u16(std::size_t pos, std::uint16_t value)
+{
+    if (!ok())
+    {
+        return;
+    }
+
+    if (pos >= max_size || pos + 1 >= max_size)
+    {
+        last_error_ = BufferError::position_out_of_bounds;
+        return;
+    }
+    set(pos, static_cast<std::uint8_t>((value >> 8) & 0xFF));
+    if (!ok())
+    {
+        return;
+    }
+
+    set(pos + 1, static_cast<std::uint8_t>(value & 0xFF));
+}
+
 void PacketBuffer::step(std::size_t steps)
 {
     if (position_ > size_ || steps > (size_ - position_))
     {
-        std::cout << "position out of bounds in step method of PacketBuffer\n";
         last_error_ = BufferError::position_out_of_bounds;
         return;
     }
@@ -49,7 +72,6 @@ void PacketBuffer::seek(std::size_t position)
 {
     if (position > size_)
     {
-        std::cout << "position out of bounds in seek method of PacketBuffer\n";
         last_error_ = BufferError::position_out_of_bounds;
         return;
     }
@@ -62,7 +84,6 @@ std::uint8_t PacketBuffer::read_single_byte()
 {
     if (position_ >= size_)
     {
-        std::cout << "read_single_byte(): reached end of valid buffer data\n";
         last_error_ = BufferError::end_of_buffer;
         return 0;
     }
@@ -157,7 +178,6 @@ void PacketBuffer::read_qname(std::string& out)
     {
         if (pos >= size_)
         {
-            std::cout << "read_qname(): position out of bounds\n";
             last_error_ = BufferError::end_of_buffer;
             return;
         }
@@ -174,25 +194,22 @@ void PacketBuffer::read_qname(std::string& out)
         {
             if (jumps_performed >= max_jumps)
             {
-                std::cout << "read_qname(): too many compression jumps\n";
                 last_error_ = BufferError::position_out_of_bounds;
                 return;
             }
 
             if (pos + 1 >= size_)
             {
-                std::cout << "read_qname(): incomplete compression pointer\n";
                 last_error_ = BufferError::end_of_buffer;
                 return;
             }
 
             const std::uint8_t second_byte{get(pos + 1)};
-            const std::uint16_t offset = static_cast<std::uint16_t>(
+            const auto offset = static_cast<std::uint16_t>(
                 ((static_cast<std::uint16_t>(length) & 0x3FU) << 8) | second_byte);
 
             if (offset >= size_)
             {
-                std::cout << "read_qname(): compression pointer out of bounds\n";
                 last_error_ = BufferError::position_out_of_bounds;
                 return;
             }
@@ -216,7 +233,6 @@ void PacketBuffer::read_qname(std::string& out)
 
         if (pos + length > size_)
         {
-            std::cout << "read_qname(): label extends past end of valid buffer data\n";
             last_error_ = BufferError::end_of_buffer;
             return;
         }
@@ -243,5 +259,227 @@ void PacketBuffer::read_qname(std::string& out)
     }
 
     last_error_ = BufferError::none;
+}
+
+namespace
+{
+constexpr std::size_t dns_max_label_length = 63;
+constexpr std::size_t dns_max_name_wire_length = 255;
+} // namespace
+
+[[nodiscard]] bool PacketBuffer::can_write(std::size_t byte_count) const
+{
+    return position_ <= max_size && byte_count <= (max_size - position_);
+}
+
+void PacketBuffer::update_size_after_write()
+{
+    size_ = std::max(size_, position_);
+}
+
+bool PacketBuffer::ok() const
+{
+    return last_error_ == BufferError::none;
+}
+
+BufferError PacketBuffer::last_error() const
+{
+    return last_error_;
+}
+
+void PacketBuffer::clear_error()
+{
+    last_error_ = BufferError::none;
+}
+
+void PacketBuffer::write(std::uint8_t value)
+{
+    if (!ok())
+    {
+        return;
+    }
+
+    if (!can_write(1))
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    buffer_[position_] = value;
+    ++position_;
+    update_size_after_write();
+}
+
+void PacketBuffer::write_u8(std::uint8_t value)
+{
+    write(value);
+}
+
+void PacketBuffer::write_u16(std::uint16_t value)
+{
+    if (!ok())
+    {
+        return;
+    }
+
+    if (!can_write(2))
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    buffer_[position_] = static_cast<std::uint8_t>((value >> 8) & 0xFF);
+    position_++;
+
+    buffer_[position_] = static_cast<std::uint8_t>(value & 0xFF);
+    position_++;
+
+    update_size_after_write();
+}
+
+void PacketBuffer::write_u32(std::uint32_t value)
+{
+    if (!ok())
+    {
+        return;
+    }
+
+    if (!can_write(4))
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    buffer_[position_] = static_cast<std::uint8_t>((value >> 24) & 0xFF);
+    position_++;
+
+    buffer_[position_] = static_cast<std::uint8_t>((value >> 16) & 0xFF);
+    position_++;
+
+    buffer_[position_] = static_cast<std::uint8_t>((value >> 8) & 0xFF);
+    position_++;
+
+    buffer_[position_] = static_cast<std::uint8_t>(value & 0xFF);
+    position_++;
+
+    update_size_after_write();
+}
+
+void PacketBuffer::write_qname(std::string_view qname)
+{
+    if (!ok())
+    {
+        return;
+    }
+    // check if we can write
+    if (qname.empty() || qname == ".")
+    {
+        write_u8(0);
+        return;
+    }
+    // trailing dot is ok
+    if (!qname.empty() && qname.back() == '.')
+    {
+        qname.remove_suffix(1);
+    }
+    // check if empty
+    if (qname.empty())
+    {
+        write_u8(0);
+        return;
+    }
+    // validate and compute encoded size
+    std::size_t encoded_size{1};
+    std::size_t current_label_length{0};
+
+    for (char ch : qname)
+    {
+        if (ch == '.') // we hit a dot, we reset everything now
+        {
+            if (current_label_length == 0) // edge case
+            {
+                last_error_ = BufferError::invalid_qname;
+                return;
+            }
+
+            encoded_size += 1 + current_label_length; // not edge case
+            current_label_length = 0;
+            continue;
+        }
+
+        ++current_label_length; // increase cur len until we hit a dot or we surpass the max length
+        if (current_label_length > dns_max_label_length)
+        {
+            last_error_ = BufferError::label_too_long;
+            return;
+        }
+    }
+    // check capcity
+    if (current_label_length == 0) // check whether the last label used was empty
+    {
+        last_error_ = BufferError::invalid_qname; // ended in invalid way
+        return;
+    }
+    encoded_size += 1 + current_label_length;    // add final label position
+    if (encoded_size > dns_max_name_wire_length) // we stop if the size is too large
+    {
+        last_error_ = BufferError::qname_too_long;
+        return;
+    }
+    // encode and write
+    if (!can_write(encoded_size))
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    std::size_t label_start{};
+    for (std::size_t i{}; i <= qname.size(); ++i)
+    {
+        const bool at_end = (i == qname.size());
+        const bool at_dot = (!at_end && qname[i] == '.');
+        if (!at_end && !at_dot)
+        {
+            continue;
+        }
+        const std::size_t label_length = i - label_start;
+        buffer_[position_] = static_cast<std::uint8_t>(label_length);
+        position_++;
+        for (std::size_t j = label_start; j < i; ++j)
+        {
+            buffer_[position_] = static_cast<std::uint8_t>(static_cast<unsigned char>(qname[j]));
+            position_++;
+        }
+        label_start = i + 1;
+    }
+    buffer_[position_] = 0;
+    ++position_;
+    update_size_after_write();
+}
+
+const std::uint8_t* PacketBuffer::data() const
+{
+    return buffer_.data();
+}
+
+std::uint8_t* PacketBuffer::data()
+{
+    return buffer_.data();
+}
+
+void PacketBuffer::set_size(std::size_t size)
+{
+    if (size > max_size)
+    {
+        last_error_ = BufferError::end_of_buffer;
+        return;
+    }
+
+    size_ = size;
+}
+
+std::size_t PacketBuffer::size() const
+{
+    return size_;
 }
 } // namespace dns

@@ -148,6 +148,27 @@ std::size_t write_compressed_a_record(PacketBuffer& buffer, std::size_t pos,
     return pos;
 }
 } // namespace
+  //
+
+namespace
+{
+
+dns::DnsRecord round_trip_record(const dns::DnsRecord& record)
+{
+    dns::PacketBuffer buffer{};
+
+    const std::size_t bytes_written = dns::write_record(record, buffer);
+
+    EXPECT_TRUE(buffer.ok());
+    EXPECT_GT(bytes_written, 0);
+
+    buffer.seek(0);
+    EXPECT_TRUE(buffer.ok());
+
+    return dns::decode_record(buffer);
+}
+
+} // namespace
 
 TEST(DnsRecordTest, DecodeARecordSingleLabel)
 {
@@ -333,4 +354,197 @@ TEST(DnsRecordTest, UnknownRecordShouldNeverMovePastEndOfBuffer)
 
     ASSERT_TRUE(std::holds_alternative<UnknownRecord>(record));
     EXPECT_LE(buffer.position(), PacketBuffer::max_size);
+}
+
+TEST(DnsRecordWriteTest, WriteARecordCorrectly)
+{
+    dns::PacketBuffer buffer{};
+
+    dns::ARecord arecord{.domain = "example.com", .addr = {1, 2, 3, 4}, .ttl = 0x11223344};
+
+    dns::DnsRecord record{arecord};
+
+    const std::size_t bytes_written = dns::write_record(record, buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(bytes_written, 27u);
+    EXPECT_EQ(buffer.position(), 27u);
+
+    // qname: 7 example 3 com 0
+    EXPECT_EQ(buffer.get(0), 7u);
+    EXPECT_EQ(buffer.get(1), static_cast<std::uint8_t>('e'));
+    EXPECT_EQ(buffer.get(2), static_cast<std::uint8_t>('x'));
+    EXPECT_EQ(buffer.get(3), static_cast<std::uint8_t>('a'));
+    EXPECT_EQ(buffer.get(4), static_cast<std::uint8_t>('m'));
+    EXPECT_EQ(buffer.get(5), static_cast<std::uint8_t>('p'));
+    EXPECT_EQ(buffer.get(6), static_cast<std::uint8_t>('l'));
+    EXPECT_EQ(buffer.get(7), static_cast<std::uint8_t>('e'));
+
+    EXPECT_EQ(buffer.get(8), 3u);
+    EXPECT_EQ(buffer.get(9), static_cast<std::uint8_t>('c'));
+    EXPECT_EQ(buffer.get(10), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(11), static_cast<std::uint8_t>('m'));
+    EXPECT_EQ(buffer.get(12), 0u);
+
+    // type A
+    EXPECT_EQ(buffer.get(13), 0x00);
+    EXPECT_EQ(buffer.get(14), 0x01);
+
+    // class IN
+    EXPECT_EQ(buffer.get(15), 0x00);
+    EXPECT_EQ(buffer.get(16), 0x01);
+
+    // ttl = 0x11223344
+    EXPECT_EQ(buffer.get(17), 0x11);
+    EXPECT_EQ(buffer.get(18), 0x22);
+    EXPECT_EQ(buffer.get(19), 0x33);
+    EXPECT_EQ(buffer.get(20), 0x44);
+
+    // rdlength = 4
+    EXPECT_EQ(buffer.get(21), 0x00);
+    EXPECT_EQ(buffer.get(22), 0x04);
+
+    // address bytes
+    EXPECT_EQ(buffer.get(23), 1u);
+    EXPECT_EQ(buffer.get(24), 2u);
+    EXPECT_EQ(buffer.get(25), 3u);
+    EXPECT_EQ(buffer.get(26), 4u);
+}
+
+TEST(DnsRecordWriteTest, WriteThenDecodeARecordRoundTrip)
+{
+    dns::PacketBuffer buffer{};
+
+    dns::ARecord written{.domain = "google.com", .addr = {8, 8, 4, 4}, .ttl = 300};
+
+    dns::DnsRecord record{written};
+
+    const std::size_t bytes_written = dns::write_record(record, buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_GT(bytes_written, 0u);
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    dns::DnsRecord decoded_record = dns::decode_record(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded_record));
+
+    const dns::ARecord& decoded = std::get<dns::ARecord>(decoded_record);
+
+    EXPECT_EQ(decoded.domain, written.domain);
+    EXPECT_EQ(decoded.addr, written.addr);
+    EXPECT_EQ(decoded.ttl, written.ttl);
+}
+
+TEST(DnsRecordWriteTest, WriteUnknownRecordWritesNothing)
+{
+    dns::PacketBuffer buffer{};
+
+    dns::UnknownRecord unknown{.domain = "example.com", .qtype = 99, .data_len = 10, .ttl = 123};
+
+    dns::DnsRecord record{unknown};
+
+    const std::size_t bytes_written = dns::write_record(record, buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(bytes_written, 0u);
+    EXPECT_EQ(buffer.position(), 0u);
+}
+
+TEST(DnsRecordChapter3Tests, CNameRecordRoundTrips)
+{
+    const dns::DnsRecord record = dns::CNameRecord{
+        .domain = "www.yahoo.com",
+        .host = "me-ycpi-cf-www.g06.yahoodns.net",
+        .ttl = 37,
+    };
+
+    const dns::DnsRecord decoded = round_trip_record(record);
+
+    ASSERT_TRUE(std::holds_alternative<dns::CNameRecord>(decoded));
+
+    const auto& cname = std::get<dns::CNameRecord>(decoded);
+
+    EXPECT_EQ(cname.domain, "www.yahoo.com");
+    EXPECT_EQ(cname.host, "me-ycpi-cf-www.g06.yahoodns.net");
+    EXPECT_EQ(cname.ttl, 37);
+}
+
+TEST(DnsRecordChapter3Tests, NSRecordRoundTrips)
+{
+    const dns::DnsRecord record = dns::NSRecord{
+        .domain = "example.com",
+        .host = "a.iana-servers.net",
+        .ttl = 300,
+    };
+
+    const dns::DnsRecord decoded = round_trip_record(record);
+
+    ASSERT_TRUE(std::holds_alternative<dns::NSRecord>(decoded));
+
+    const auto& ns = std::get<dns::NSRecord>(decoded);
+
+    EXPECT_EQ(ns.domain, "example.com");
+    EXPECT_EQ(ns.host, "a.iana-servers.net");
+    EXPECT_EQ(ns.ttl, 300);
+}
+
+TEST(DnsRecordChapter3Tests, MXRecordRoundTrips)
+{
+    const dns::DnsRecord record = dns::MXRecord{
+        .domain = "example.com",
+        .priority = 10,
+        .host = "mail.example.com",
+        .ttl = 600,
+    };
+
+    const dns::DnsRecord decoded = round_trip_record(record);
+
+    ASSERT_TRUE(std::holds_alternative<dns::MXRecord>(decoded));
+
+    const auto& mx = std::get<dns::MXRecord>(decoded);
+
+    EXPECT_EQ(mx.domain, "example.com");
+    EXPECT_EQ(mx.priority, 10);
+    EXPECT_EQ(mx.host, "mail.example.com");
+    EXPECT_EQ(mx.ttl, 600);
+}
+
+TEST(DnsRecordChapter3Tests, AAAARecordRoundTrips)
+{
+    const dns::DnsRecord record = dns::AAAARecord{
+        .domain = "example.com",
+        .addr =
+            std::array<std::uint16_t, 8>{
+                0x2606,
+                0x2800,
+                0x0220,
+                0x0001,
+                0x0248,
+                0x1893,
+                0x25c8,
+                0x1946,
+            },
+        .ttl = 120,
+    };
+
+    const dns::DnsRecord decoded = round_trip_record(record);
+
+    ASSERT_TRUE(std::holds_alternative<dns::AAAARecord>(decoded));
+
+    const auto& aaaa = std::get<dns::AAAARecord>(decoded);
+
+    EXPECT_EQ(aaaa.domain, "example.com");
+    EXPECT_EQ(aaaa.addr[0], 0x2606);
+    EXPECT_EQ(aaaa.addr[1], 0x2800);
+    EXPECT_EQ(aaaa.addr[2], 0x0220);
+    EXPECT_EQ(aaaa.addr[3], 0x0001);
+    EXPECT_EQ(aaaa.addr[4], 0x0248);
+    EXPECT_EQ(aaaa.addr[5], 0x1893);
+    EXPECT_EQ(aaaa.addr[6], 0x25c8);
+    EXPECT_EQ(aaaa.addr[7], 0x1946);
+    EXPECT_EQ(aaaa.ttl, 120);
 }

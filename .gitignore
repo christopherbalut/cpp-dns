@@ -23,6 +23,7 @@
 *.gcno
 *.gcda
 *.gcov
+*.cache/
 
 # Test and CTest artifacts
 /Testing/
@@ -43,3 +44,4 @@ Thumbs.db
 
 # Local scratch files
 buf.txt
+.cache/

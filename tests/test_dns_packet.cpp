@@ -244,7 +244,7 @@ TEST(DnsPacketTest, DecodeAllSectionsPreservesCountsOrderAndContents)
     EXPECT_EQ(packet.questions[0].name, "");
     EXPECT_EQ(packet.questions[0].qtype, QueryType::A);
     EXPECT_EQ(packet.questions[1].name, "");
-    EXPECT_EQ(packet.questions[1].qtype, QueryType::Unknown);
+    EXPECT_EQ(packet.questions[1].qtype, QueryType::AAAA);
 
     ASSERT_EQ(packet.answers.size(), 2U);
     ASSERT_TRUE(std::holds_alternative<ARecord>(packet.answers[0]));
@@ -283,9 +283,9 @@ TEST(DnsPacketTest, DecodeClearsPreviousStateBeforeReadingNewPacket)
 {
     DnsPacket packet{};
     packet.header.id = 9999;
-    packet.questions.push_back(DnsQuestion{"stale", QueryType::A});
-    packet.answers.push_back(ARecord{.domain = "stale", .addr = {1, 1, 1, 1}, .ttl = 1});
-    packet.authorities.push_back(
+    packet.questions.emplace_back("stale", QueryType::A);
+    packet.answers.emplace_back(ARecord{.domain = "stale", .addr = {1, 1, 1, 1}, .ttl = 1});
+    packet.authorities.emplace_back(
         UnknownRecord{.domain = "stale", .qtype = 15, .data_len = 2, .ttl = 10});
     packet.resources.push_back(ARecord{.domain = "stale", .addr = {9, 9, 9, 9}, .ttl = 9});
 
@@ -336,8 +336,8 @@ TEST(DnsPacketTest, DecodeWorksFromNonZeroBufferOffset)
 TEST(DnsPacketTest, TruncatedHeaderStillResetsPacketAndDoesNotLeaveStaleSections)
 {
     DnsPacket packet{};
-    packet.questions.push_back(DnsQuestion{"old", QueryType::A});
-    packet.answers.push_back(ARecord{.domain = "old", .addr = {1, 1, 1, 1}, .ttl = 1});
+    packet.questions.emplace_back("old", QueryType::A);
+    packet.answers.emplace_back(ARecord{.domain = "old", .addr = {1, 1, 1, 1}, .ttl = 1});
 
     PacketBuffer buffer{};
     std::size_t pos = 0;
@@ -360,12 +360,6 @@ TEST(DnsPacketTest, TruncatedHeaderStillResetsPacketAndDoesNotLeaveStaleSections
     EXPECT_EQ(buffer.position(), pos);
 }
 
-/*
- * This is an integration test for normal DNS names and compression.
- * It is expected to pass once PacketBuffer::read_qname() is fully correct.
- * If it fails right now, that usually means the lower-level qname parser
- * still has one of the Rust-to-C++ translation bugs.
- */
 TEST(DnsPacketTest, DecodeQuestionAndCompressedAnswerName)
 {
     PacketBuffer buffer{};
@@ -394,4 +388,310 @@ TEST(DnsPacketTest, DecodeQuestionAndCompressedAnswerName)
     EXPECT_EQ(answer.ttl, 99U);
 
     EXPECT_EQ(buffer.position(), end);
+}
+
+TEST(DnsPacketWriteTest, WriteQueryPacketCorrectly)
+{
+    dns::DnsPacket packet{};
+    dns::PacketBuffer buffer{};
+
+    packet.header.id = 0x1234;
+    packet.header.recursion_desired = true;
+    packet.questions.emplace_back("google.com", dns::QueryType::A);
+
+    packet.write_to_buffer(buffer); // use packet.write(buffer) if that is your name
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(buffer.position(), 28u);
+
+    // Header
+    EXPECT_EQ(buffer.get(0), 0x12);
+    EXPECT_EQ(buffer.get(1), 0x34);
+
+    // top flags byte: RD = 1
+    EXPECT_EQ(buffer.get(2), 0x01);
+    EXPECT_EQ(buffer.get(3), 0x00);
+
+    EXPECT_EQ(buffer.get(4), 0x00); // questions = 1
+    EXPECT_EQ(buffer.get(5), 0x01);
+
+    EXPECT_EQ(buffer.get(6), 0x00); // answers = 0
+    EXPECT_EQ(buffer.get(7), 0x00);
+
+    EXPECT_EQ(buffer.get(8), 0x00); // authorities = 0
+    EXPECT_EQ(buffer.get(9), 0x00);
+
+    EXPECT_EQ(buffer.get(10), 0x00); // resources = 0
+    EXPECT_EQ(buffer.get(11), 0x00);
+
+    // Question: google.com, type A, class IN
+    EXPECT_EQ(buffer.get(12), 6u);
+    EXPECT_EQ(buffer.get(13), static_cast<std::uint8_t>('g'));
+    EXPECT_EQ(buffer.get(14), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(15), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(16), static_cast<std::uint8_t>('g'));
+    EXPECT_EQ(buffer.get(17), static_cast<std::uint8_t>('l'));
+    EXPECT_EQ(buffer.get(18), static_cast<std::uint8_t>('e'));
+
+    EXPECT_EQ(buffer.get(19), 3u);
+    EXPECT_EQ(buffer.get(20), static_cast<std::uint8_t>('c'));
+    EXPECT_EQ(buffer.get(21), static_cast<std::uint8_t>('o'));
+    EXPECT_EQ(buffer.get(22), static_cast<std::uint8_t>('m'));
+    EXPECT_EQ(buffer.get(23), 0u);
+
+    EXPECT_EQ(buffer.get(24), 0x00); // qtype A
+    EXPECT_EQ(buffer.get(25), 0x01);
+    EXPECT_EQ(buffer.get(26), 0x00); // qclass IN
+    EXPECT_EQ(buffer.get(27), 0x01);
+}
+
+TEST(DnsPacketWriteTest, WriteThenDecodeRepresentativePacketRoundTrip)
+{
+    dns::DnsPacket written{};
+    dns::PacketBuffer buffer{};
+
+    written.header.id = 0xBEEF;
+    written.header.recursion_desired = true;
+
+    written.questions.emplace_back("example.com", dns::QueryType::A);
+
+    written.answers.emplace_back(
+        dns::ARecord{.domain = "example.com", .addr = {1, 2, 3, 4}, .ttl = 300});
+
+    written.authorities.emplace_back(
+        dns::ARecord{.domain = "ns.example.com", .addr = {5, 6, 7, 8}, .ttl = 400});
+
+    written.resources.emplace_back(
+        dns::ARecord{.domain = "cache.example.com", .addr = {9, 10, 11, 12}, .ttl = 500});
+
+    written.write_to_buffer(buffer); // use packet.write(buffer) if that is your name
+
+    ASSERT_TRUE(buffer.ok());
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    dns::DnsPacket decoded{};
+    decoded.decode_from_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    EXPECT_EQ(decoded.header.id, written.header.id);
+    EXPECT_TRUE(decoded.header.recursion_desired);
+
+    EXPECT_EQ(decoded.questions.size(), 1u);
+    EXPECT_EQ(decoded.answers.size(), 1u);
+    EXPECT_EQ(decoded.authorities.size(), 1u);
+    EXPECT_EQ(decoded.resources.size(), 1u);
+
+    EXPECT_EQ(decoded.questions[0].name, "example.com");
+    EXPECT_EQ(decoded.questions[0].qtype, dns::QueryType::A);
+
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.answers[0]));
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.authorities[0]));
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.resources[0]));
+
+    const dns::ARecord& answer = std::get<dns::ARecord>(decoded.answers[0]);
+    const dns::ARecord& authority = std::get<dns::ARecord>(decoded.authorities[0]);
+    const dns::ARecord& resource = std::get<dns::ARecord>(decoded.resources[0]);
+
+    EXPECT_EQ(answer.domain, "example.com");
+    EXPECT_EQ(answer.addr, (std::array<std::uint8_t, 4>{1, 2, 3, 4}));
+    EXPECT_EQ(answer.ttl, 300u);
+
+    EXPECT_EQ(authority.domain, "ns.example.com");
+    EXPECT_EQ(authority.addr, (std::array<std::uint8_t, 4>{5, 6, 7, 8}));
+    EXPECT_EQ(authority.ttl, 400u);
+
+    EXPECT_EQ(resource.domain, "cache.example.com");
+    EXPECT_EQ(resource.addr, (std::array<std::uint8_t, 4>{9, 10, 11, 12}));
+    EXPECT_EQ(resource.ttl, 500u);
+}
+
+TEST(DnsPacketWriteTest, WriteSkipsUnknownRecordsWhenSettingCounts)
+{
+    dns::DnsPacket packet{};
+    dns::PacketBuffer buffer{};
+
+    packet.answers.emplace_back(dns::UnknownRecord{
+        .domain = "ignored.example.com", .qtype = 99, .data_len = 10, .ttl = 111});
+
+    packet.answers.emplace_back(
+        dns::ARecord{.domain = "kept.example.com", .addr = {8, 8, 8, 8}, .ttl = 222});
+
+    packet.write_to_buffer(buffer); // use packet.write(buffer) if that is your name
+
+    ASSERT_TRUE(buffer.ok());
+
+    // ancount should be 1, not 2
+    EXPECT_EQ(buffer.get(6), 0x00);
+    EXPECT_EQ(buffer.get(7), 0x01);
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    dns::DnsPacket decoded{};
+    decoded.decode_from_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+    EXPECT_EQ(decoded.answers.size(), 1u);
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.answers[0]));
+
+    const dns::ARecord& answer = std::get<dns::ARecord>(decoded.answers[0]);
+    EXPECT_EQ(answer.domain, "kept.example.com");
+    EXPECT_EQ(answer.addr, (std::array<std::uint8_t, 4>{8, 8, 8, 8}));
+    EXPECT_EQ(answer.ttl, 222u);
+}
+
+TEST(DnsPacketTest, DecodeGoogleAResponseFromRawBytes)
+{
+    const std::array<std::uint8_t, 44> raw_response{
+        0x1a, 0x0a, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x06, 0x67, 0x6f,
+        0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c,
+        0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x8a, 0x00, 0x04, 0x8e, 0xfa, 0x45, 0x2e};
+
+    dns::PacketBuffer buffer{};
+    std::copy(raw_response.begin(), raw_response.end(), buffer.data());
+
+    buffer.set_size(raw_response.size());
+    buffer.seek(0);
+
+    dns::DnsPacket packet{};
+    packet.decode_from_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    EXPECT_EQ(packet.header.id, 6666);
+    EXPECT_TRUE(packet.header.response);
+    EXPECT_TRUE(packet.header.recursion_desired);
+    EXPECT_TRUE(packet.header.recursion_available);
+    EXPECT_EQ(packet.header.questions, 1);
+    EXPECT_EQ(packet.header.answers, 1);
+    EXPECT_EQ(packet.header.authoritative_entries, 0);
+    EXPECT_EQ(packet.header.resource_entries, 0);
+
+    ASSERT_EQ(packet.questions.size(), 1);
+    EXPECT_EQ(packet.questions[0].name, "google.com");
+    EXPECT_EQ(packet.questions[0].qtype, dns::QueryType::A);
+
+    ASSERT_EQ(packet.answers.size(), 1);
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(packet.answers[0]));
+
+    const auto& answer = std::get<dns::ARecord>(packet.answers[0]);
+
+    EXPECT_EQ(answer.domain, "google.com");
+    EXPECT_EQ(answer.ttl, 138);
+    EXPECT_EQ(answer.addr[0], 142);
+    EXPECT_EQ(answer.addr[1], 250);
+    EXPECT_EQ(answer.addr[2], 69);
+    EXPECT_EQ(answer.addr[3], 46);
+}
+
+TEST(DnsPacketTest, PacketRoundTripsWithPart3Records)
+{
+    dns::DnsPacket original{};
+
+    original.header.id = 0xBEEF;
+    original.header.recursion_desired = true;
+    original.header.response = true;
+
+    original.questions.emplace_back("www.yahoo.com", dns::QueryType::A);
+
+    original.answers.emplace_back(dns::CNameRecord{
+        .domain = "www.yahoo.com",
+        .host = "me-ycpi-cf-www.g06.yahoodns.net",
+        .ttl = 37,
+    });
+
+    original.answers.emplace_back(dns::ARecord{
+        .domain = "me-ycpi-cf-www.g06.yahoodns.net",
+        .addr = std::array<std::uint8_t, 4>{69, 147, 82, 60},
+        .ttl = 54,
+    });
+
+    original.authorities.emplace_back(dns::NSRecord{
+        .domain = "yahoo.com",
+        .host = "ns1.yahoo.com",
+        .ttl = 300,
+    });
+
+    original.resources.emplace_back(dns::AAAARecord{
+        .domain = "example.com",
+        .addr =
+            std::array<std::uint16_t, 8>{
+                0x2606,
+                0x2800,
+                0x0220,
+                0x0001,
+                0x0248,
+                0x1893,
+                0x25c8,
+                0x1946,
+            },
+        .ttl = 120,
+    });
+
+    dns::PacketBuffer buffer{};
+
+    original.write_to_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    dns::DnsPacket decoded{};
+    decoded.decode_from_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    EXPECT_EQ(decoded.header.id, 0xBEEF);
+    EXPECT_TRUE(decoded.header.recursion_desired);
+    EXPECT_TRUE(decoded.header.response);
+
+    EXPECT_EQ(decoded.header.questions, 1U);
+    EXPECT_EQ(decoded.header.answers, 2U);
+    EXPECT_EQ(decoded.header.authoritative_entries, 1U);
+    EXPECT_EQ(decoded.header.resource_entries, 1U);
+
+    ASSERT_EQ(decoded.questions.size(), 1U);
+    EXPECT_EQ(decoded.questions[0].name, "www.yahoo.com");
+    EXPECT_EQ(decoded.questions[0].qtype, dns::QueryType::A);
+
+    ASSERT_EQ(decoded.answers.size(), 2U);
+    ASSERT_TRUE(std::holds_alternative<dns::CNameRecord>(decoded.answers[0]));
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.answers[1]));
+
+    const auto& cname = std::get<dns::CNameRecord>(decoded.answers[0]);
+    EXPECT_EQ(cname.domain, "www.yahoo.com");
+    EXPECT_EQ(cname.host, "me-ycpi-cf-www.g06.yahoodns.net");
+    EXPECT_EQ(cname.ttl, 37U);
+
+    const auto& answer_a = std::get<dns::ARecord>(decoded.answers[1]);
+    EXPECT_EQ(answer_a.domain, "me-ycpi-cf-www.g06.yahoodns.net");
+    EXPECT_EQ(answer_a.addr, (std::array<std::uint8_t, 4>{69, 147, 82, 60}));
+    EXPECT_EQ(answer_a.ttl, 54U);
+
+    ASSERT_EQ(decoded.authorities.size(), 1U);
+    ASSERT_TRUE(std::holds_alternative<dns::NSRecord>(decoded.authorities[0]));
+
+    const auto& ns = std::get<dns::NSRecord>(decoded.authorities[0]);
+    EXPECT_EQ(ns.domain, "yahoo.com");
+    EXPECT_EQ(ns.host, "ns1.yahoo.com");
+    EXPECT_EQ(ns.ttl, 300U);
+
+    ASSERT_EQ(decoded.resources.size(), 1U);
+    ASSERT_TRUE(std::holds_alternative<dns::AAAARecord>(decoded.resources[0]));
+
+    const auto& aaaa = std::get<dns::AAAARecord>(decoded.resources[0]);
+    EXPECT_EQ(aaaa.domain, "example.com");
+    EXPECT_EQ(aaaa.addr[0], 0x2606);
+    EXPECT_EQ(aaaa.addr[1], 0x2800);
+    EXPECT_EQ(aaaa.addr[2], 0x0220);
+    EXPECT_EQ(aaaa.addr[3], 0x0001);
+    EXPECT_EQ(aaaa.addr[4], 0x0248);
+    EXPECT_EQ(aaaa.addr[5], 0x1893);
+    EXPECT_EQ(aaaa.addr[6], 0x25c8);
+    EXPECT_EQ(aaaa.addr[7], 0x1946);
+    EXPECT_EQ(aaaa.ttl, 120U);
 }
