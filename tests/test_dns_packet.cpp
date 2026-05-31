@@ -586,3 +586,112 @@ TEST(DnsPacketTest, DecodeGoogleAResponseFromRawBytes)
     EXPECT_EQ(answer.addr[2], 69);
     EXPECT_EQ(answer.addr[3], 46);
 }
+
+TEST(DnsPacketTest, PacketRoundTripsWithPart3Records)
+{
+    dns::DnsPacket original{};
+
+    original.header.id = 0xBEEF;
+    original.header.recursion_desired = true;
+    original.header.response = true;
+
+    original.questions.emplace_back("www.yahoo.com", dns::QueryType::A);
+
+    original.answers.emplace_back(dns::CNameRecord{
+        .domain = "www.yahoo.com",
+        .host = "me-ycpi-cf-www.g06.yahoodns.net",
+        .ttl = 37,
+    });
+
+    original.answers.emplace_back(dns::ARecord{
+        .domain = "me-ycpi-cf-www.g06.yahoodns.net",
+        .addr = std::array<std::uint8_t, 4>{69, 147, 82, 60},
+        .ttl = 54,
+    });
+
+    original.authorities.emplace_back(dns::NSRecord{
+        .domain = "yahoo.com",
+        .host = "ns1.yahoo.com",
+        .ttl = 300,
+    });
+
+    original.resources.emplace_back(dns::AAAARecord{
+        .domain = "example.com",
+        .addr =
+            std::array<std::uint16_t, 8>{
+                0x2606,
+                0x2800,
+                0x0220,
+                0x0001,
+                0x0248,
+                0x1893,
+                0x25c8,
+                0x1946,
+            },
+        .ttl = 120,
+    });
+
+    dns::PacketBuffer buffer{};
+
+    original.write_to_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    buffer.seek(0);
+    ASSERT_TRUE(buffer.ok());
+
+    dns::DnsPacket decoded{};
+    decoded.decode_from_buffer(buffer);
+
+    ASSERT_TRUE(buffer.ok());
+
+    EXPECT_EQ(decoded.header.id, 0xBEEF);
+    EXPECT_TRUE(decoded.header.recursion_desired);
+    EXPECT_TRUE(decoded.header.response);
+
+    EXPECT_EQ(decoded.header.questions, 1U);
+    EXPECT_EQ(decoded.header.answers, 2U);
+    EXPECT_EQ(decoded.header.authoritative_entries, 1U);
+    EXPECT_EQ(decoded.header.resource_entries, 1U);
+
+    ASSERT_EQ(decoded.questions.size(), 1U);
+    EXPECT_EQ(decoded.questions[0].name, "www.yahoo.com");
+    EXPECT_EQ(decoded.questions[0].qtype, dns::QueryType::A);
+
+    ASSERT_EQ(decoded.answers.size(), 2U);
+    ASSERT_TRUE(std::holds_alternative<dns::CNameRecord>(decoded.answers[0]));
+    ASSERT_TRUE(std::holds_alternative<dns::ARecord>(decoded.answers[1]));
+
+    const auto& cname = std::get<dns::CNameRecord>(decoded.answers[0]);
+    EXPECT_EQ(cname.domain, "www.yahoo.com");
+    EXPECT_EQ(cname.host, "me-ycpi-cf-www.g06.yahoodns.net");
+    EXPECT_EQ(cname.ttl, 37U);
+
+    const auto& answer_a = std::get<dns::ARecord>(decoded.answers[1]);
+    EXPECT_EQ(answer_a.domain, "me-ycpi-cf-www.g06.yahoodns.net");
+    EXPECT_EQ(answer_a.addr, (std::array<std::uint8_t, 4>{69, 147, 82, 60}));
+    EXPECT_EQ(answer_a.ttl, 54U);
+
+    ASSERT_EQ(decoded.authorities.size(), 1U);
+    ASSERT_TRUE(std::holds_alternative<dns::NSRecord>(decoded.authorities[0]));
+
+    const auto& ns = std::get<dns::NSRecord>(decoded.authorities[0]);
+    EXPECT_EQ(ns.domain, "yahoo.com");
+    EXPECT_EQ(ns.host, "ns1.yahoo.com");
+    EXPECT_EQ(ns.ttl, 300U);
+
+    ASSERT_EQ(decoded.resources.size(), 1U);
+    ASSERT_TRUE(std::holds_alternative<dns::AAAARecord>(decoded.resources[0]));
+
+    const auto& aaaa = std::get<dns::AAAARecord>(decoded.resources[0]);
+    EXPECT_EQ(aaaa.domain, "example.com");
+    EXPECT_EQ(aaaa.addr[0], 0x2606);
+    EXPECT_EQ(aaaa.addr[1], 0x2800);
+    EXPECT_EQ(aaaa.addr[2], 0x0220);
+    EXPECT_EQ(aaaa.addr[3], 0x0001);
+    EXPECT_EQ(aaaa.addr[4], 0x0248);
+    EXPECT_EQ(aaaa.addr[5], 0x1893);
+    EXPECT_EQ(aaaa.addr[6], 0x25c8);
+    EXPECT_EQ(aaaa.addr[7], 0x1946);
+    EXPECT_EQ(aaaa.ttl, 120U);
+}
