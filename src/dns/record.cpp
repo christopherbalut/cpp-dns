@@ -14,6 +14,13 @@ namespace
 constexpr std::uint16_t dns_class_in = 1;
 constexpr std::uint16_t ipv4_rdata_length = 4;
 constexpr std::uint16_t ipv6_rdata_length = 16;
+
+template <typename... Ts> struct Overloaded : Ts...
+{
+    using Ts::operator()...;
+};
+
+template <typename... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 } // namespace
 DnsRecord decode_record(PacketBuffer& buffer)
 {
@@ -195,69 +202,51 @@ std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
     }
 
     std::visit(
-        [&](const auto& rec)
-        {
-            using T = std::decay_t<decltype(rec)>;
-
-            if constexpr (std::is_same_v<T, ARecord>)
+        Overloaded{
+            [&buffer](const ARecord& rec)
             {
                 buffer.write_qname(rec.domain);
                 if (!buffer.ok())
-                {
                     return;
-                }
 
-                buffer.write_u16(static_cast<std::uint16_t>(QueryType::A));
+                buffer.write_u16(to_code(QueryType::A));
                 if (!buffer.ok())
-                {
                     return;
-                }
 
                 buffer.write_u16(dns_class_in);
                 if (!buffer.ok())
-                {
                     return;
-                }
 
                 buffer.write_u32(rec.ttl);
                 if (!buffer.ok())
-                {
                     return;
-                }
 
                 buffer.write_u16(ipv4_rdata_length);
                 if (!buffer.ok())
-                {
                     return;
-                }
 
                 buffer.write_u8(rec.addr[0]);
                 if (!buffer.ok())
-                {
                     return;
-                }
 
                 buffer.write_u8(rec.addr[1]);
                 if (!buffer.ok())
-                {
                     return;
-                }
 
                 buffer.write_u8(rec.addr[2]);
                 if (!buffer.ok())
-                {
                     return;
-                }
 
                 buffer.write_u8(rec.addr[3]);
-            }
-            else if constexpr (std::is_same_v<T, NSRecord>)
+            },
+
+            [&buffer](const NSRecord& rec)
             {
                 buffer.write_qname(rec.domain);
                 if (!buffer.ok())
                     return;
 
-                buffer.write_u16(static_cast<std::uint16_t>(QueryType::NS));
+                buffer.write_u16(to_code(QueryType::NS));
                 if (!buffer.ok())
                     return;
 
@@ -281,14 +270,15 @@ std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
 
                 const std::size_t data_length = buffer.position() - data_start;
                 buffer.set_u16(length_position, static_cast<std::uint16_t>(data_length));
-            }
-            else if constexpr (std::is_same_v<T, CNameRecord>)
+            },
+
+            [&buffer](const CNameRecord& rec)
             {
                 buffer.write_qname(rec.domain);
                 if (!buffer.ok())
                     return;
 
-                buffer.write_u16(static_cast<std::uint16_t>(QueryType::CNAME));
+                buffer.write_u16(to_code(QueryType::CNAME));
                 if (!buffer.ok())
                     return;
 
@@ -312,14 +302,15 @@ std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
 
                 const std::size_t data_length = buffer.position() - data_start;
                 buffer.set_u16(length_position, static_cast<std::uint16_t>(data_length));
-            }
-            else if constexpr (std::is_same_v<T, MXRecord>)
+            },
+
+            [&buffer](const MXRecord& rec)
             {
                 buffer.write_qname(rec.domain);
                 if (!buffer.ok())
                     return;
 
-                buffer.write_u16(static_cast<std::uint16_t>(QueryType::MX));
+                buffer.write_u16(to_code(QueryType::MX));
                 if (!buffer.ok())
                     return;
 
@@ -348,14 +339,15 @@ std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
 
                 const std::size_t data_length = buffer.position() - data_start;
                 buffer.set_u16(length_position, static_cast<std::uint16_t>(data_length));
-            }
-            else if constexpr (std::is_same_v<T, AAAARecord>)
+            },
+
+            [&buffer](const AAAARecord& rec)
             {
                 buffer.write_qname(rec.domain);
                 if (!buffer.ok())
                     return;
 
-                buffer.write_u16(static_cast<std::uint16_t>(QueryType::AAAA));
+                buffer.write_u16(to_code(QueryType::AAAA));
                 if (!buffer.ok())
                     return;
 
@@ -377,23 +369,17 @@ std::size_t write_record(const DnsRecord& record, PacketBuffer& buffer)
                     if (!buffer.ok())
                         return;
                 }
-            }
-            else if constexpr (std::is_same_v<T, UnknownRecord>)
+            },
+
+            [](const UnknownRecord&)
             {
                 // Skip unsupported record types for now.
-            }
+            },
         },
         record);
 
     return buffer.position() - start_position;
 }
-
-template <typename... Ts> struct Overloaded : Ts...
-{
-    using Ts::operator()...;
-};
-
-template <typename... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
 std::ostream& operator<<(std::ostream& os, const dns::DnsRecord& record)
 {
