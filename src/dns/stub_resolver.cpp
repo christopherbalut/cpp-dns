@@ -1,4 +1,5 @@
 #include "dns/stub_resolver.hpp"
+#include "dns/socket_utils.hpp"
 
 #include "dns/buffer.hpp"
 #include "dns/question.hpp"
@@ -7,60 +8,12 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <cerrno>
 #include <cstddef>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
-
-namespace
-{
-
-class UniqueSocket // wrapper class to own socket file descriptor
-{
-  public:
-    explicit UniqueSocket(int fd)
-        : fd_{fd} {} // explicit constructor to now allow conversion from int to UniqueSocket
-
-    ~UniqueSocket() // destructor for class
-    {
-        if (fd_ >= 0)
-        {
-            close(fd_);
-        }
-    }
-
-    UniqueSocket(const UniqueSocket&) = delete;            // disable copy constructor
-    UniqueSocket& operator=(const UniqueSocket&) = delete; // disable copy assignment
-
-    UniqueSocket(UniqueSocket&& other) noexcept
-        : fd_{std::exchange(other.fd_, -1)} {} // move constructor between two sockets
-
-    UniqueSocket& operator=(UniqueSocket&& other) noexcept // move assignment
-    {
-        if (this != &other) // removes weird s1 = move(s1)
-        {
-            if (fd_ >= 0)
-            {
-                close(fd_);
-            }
-
-            fd_ = std::exchange(other.fd_, -1);
-        }
-
-        return *this;
-    }
-
-    [[nodiscard]] int get() const // getter
-    {
-        return fd_;
-    }
-
-  private:
-    int fd_{-1}; // initialize by default the fd to -1 i.e. no ownership
-};
 
 struct AddrInfoDeleter
 {
@@ -74,13 +27,6 @@ struct AddrInfoDeleter
 };
 
 using AddrInfoPtr = std::unique_ptr<addrinfo, AddrInfoDeleter>;
-
-[[noreturn]] void throw_errno_error(const char* message)
-{
-    throw std::runtime_error(std::string{message} + ": " + std::strerror(errno));
-}
-
-} // namespace
 
 namespace dns
 {
@@ -125,6 +71,15 @@ DnsPacket StubResolver::lookup(std::string_view name, QueryType qtype) const
     if (socketfd.get() < 0)
     {
         throw_errno_error("socket() failed");
+    }
+
+    timeval timeout{};
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+
+    if (setsockopt(socketfd.get(), SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
+    {
+        throw_errno_error("setsockopt(SO_RCVTIMEO) failed");
     }
 
     addrinfo hints{};
@@ -178,6 +133,11 @@ DnsPacket StubResolver::lookup(std::string_view name, QueryType qtype) const
     if (!response_buffer.ok())
     {
         throw std::runtime_error{"response buffer error after decode"};
+    }
+
+    if (response_packet.header.id != request_packet.header.id)
+    {
+        throw std::runtime_error{"DNS response ID does not match request ID"};
     }
 
     return response_packet;
