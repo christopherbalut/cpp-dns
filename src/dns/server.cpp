@@ -1,4 +1,5 @@
 #include "dns/server.hpp"
+#include "dns/buffer.hpp"
 #include "dns/socket_utils.hpp"
 
 #include <arpa/inet.h>
@@ -57,8 +58,28 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
 
 void DnsServer::handle_query(int socket_fd) const
 {
-    (void)socket_fd;
     // recieve packet
+    // prepare empty storage for packet bytes
+    PacketBuffer request_packet{};
+    // prepare empty storage for client address
+    sockaddr_storage client_addr{};
+    // block/wait until a UDP DNS query arrives
+    socklen_t client_addr_len = sizeof(client_addr);
+    // recvfrom() fills the packet buffer with the bytes
+    const ssize_t bytes_recieved =
+        recvfrom(socket_fd, request_packet.data(), PacketBuffer::max_size, 0,
+                 reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len);
+    // recvfrom() fills the client_addr with the senders address
+    // check for recieve errors
+    if (bytes_recieved < 0)
+    {
+        throw_errno_error("recvfrom() failed...");
+    }
+    // tell PacketBuffer how many bytes are valid
+    request_packet.set_size(static_cast<std::size_t>(bytes_recieved));
+    // reset cursor to the beginning
+    request_packet.seek(0);
+    // now packet is ready to decode
     // decode packet
     // build response
     // send response
