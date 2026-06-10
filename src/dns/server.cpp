@@ -1,6 +1,8 @@
 #include "dns/server.hpp"
 #include "dns/buffer.hpp"
+#include "dns/packet.hpp"
 #include "dns/socket_utils.hpp"
+#include "dns/types.hpp"
 
 #include <arpa/inet.h>
 #include <iostream>
@@ -81,7 +83,34 @@ void DnsServer::handle_query(int socket_fd) const
     request_packet.seek(0);
     // now packet is ready to decode
     // decode packet
+    DnsPacket request{};
+    request.decode_from_buffer(request_packet);
     // build response
+    //
+    // create empty DNS response packet
+    DnsPacket response{};
+    // make id match the clients request id
+    response.header.id = request.header.id;
+    response.header.response = true;
+    response.header.recursion_desired = request.header.recursion_desired;
+    response.header.recursion_available = true;
+    // mark it as the response
+    // if request is malformed: return FORMERR
+    if (!request_packet.ok())
+    {
+        response.header.rescode = ResultCode::formerr;
+    }
+    else if (request.questions.empty())
+    {
+        response.header.rescode = ResultCode::formerr;
+    }
+    else
+    {
+    }
+    // if request has a question, foward it upstream
+    // copy upstream answers in reponse
+    // if upstream fails. return SERVFAIL
+    // serialize response into bytes
     // send response
 }
 } // namespace dns
