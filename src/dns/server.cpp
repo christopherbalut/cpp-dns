@@ -32,7 +32,11 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
         throw std::runtime_error{"Invalid bind ip address"};
     }
     // bind socket to IP and port
-    if
+    if (bind(socketfd.get(), reinterpret_cast<const sockaddr*>(&server_addr), sizeof(server_addr)) <
+        0)
+    {
+        throw_errno_error("bind() failed");
+    }
 
     // loop call handle_query
 }
