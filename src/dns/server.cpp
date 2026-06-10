@@ -2,6 +2,7 @@
 #include "dns/socket_utils.hpp"
 
 #include <arpa/inet.h>
+#include <iostream>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <stdexcept>
@@ -38,7 +39,20 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
         throw_errno_error("bind() failed");
     }
 
+    std::cout << "DNS Server listening on " << bind_ip << ':' << port << "\n";
+
     // loop call handle_query
+    while (true)
+    {
+        try
+        {
+            handle_query(socketfd.get());
+        }
+        catch (const std::exception& error)
+        {
+            std::cerr << "An error occurred while handle query: " << error.what() << "\n";
+        }
+    }
 }
 
 void DnsServer::handle_query(int socket_fd) const
