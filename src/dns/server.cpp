@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <sys/socket.h>
+#include <sys/types.h>
 
 namespace dns
 {
@@ -106,11 +107,55 @@ void DnsServer::handle_query(int socket_fd) const
     }
     else
     {
+        DnsQuestion question = std::move(request.questions.back());
+        request.questions.pop_back();
+
+        std::cout << "Recieved query: " << question.name << "\n";
+
+        response.questions.emplace_back(question);
+
+        try
+        {
+            DnsPacket result = resolver_.lookup(question.name, question.qtype);
+
+            response.header.rescode = result.header.rescode;
+            response.answers = std::move(result.answers);
+            response.authorities = std::move(result.authorities);
+            response.resources = std::move(result.resources);
+        }
+        catch (const std::exception& error)
+        {
+            std::cerr << "Upstream lookup failed: " << error.what() << "\n";
+            response.header.rescode = ResultCode::servfail;
+        }
     }
+
+    PacketBuffer response_buffer{};
+    response.write_to_buffer(response_buffer);
+
+    if (!response_buffer.ok())
+    {
+        throw std::runtime_error{"failed to write DNS reponse packet"};
+    }
+
     // if request has a question, foward it upstream
     // copy upstream answers in reponse
     // if upstream fails. return SERVFAIL
     // serialize response into bytes
     // send response
+    const std::size_t bytes_to_send{response_buffer.position()};
+
+    const ssize_t bytes_sent{sendto(socket_fd, response_buffer.data(), bytes_to_send, 0,
+                                    reinterpret_cast<const sockaddr*>(&client_addr),
+                                    client_addr_len)};
+    if (bytes_sent < 0)
+    {
+        throw_errno_error("sendto() failed");
+    }
+
+    if (static_cast<std::size_t>(bytes_sent) != bytes_to_send)
+    {
+        throw std::runtime_error{"sendto() sent fewer bytes than expected"};
+    }
 }
 } // namespace dns
