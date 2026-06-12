@@ -15,6 +15,50 @@
 
 namespace dns
 {
+
+DnsPacket make_base_response(const DnsPacket& request)
+{
+    DnsPacket response{};
+
+    response.header.id = request.header.id;
+    response.header.response = true;
+    response.header.recursion_desired = request.header.recursion_desired;
+    response.header.recursion_available = true;
+
+    return response;
+}
+
+DnsPacket make_formerr_response(const DnsPacket& request)
+{
+    DnsPacket response = make_base_response(request);
+    response.header.rescode = ResultCode::formerr;
+    return response;
+}
+
+DnsPacket make_servfail_response(const DnsPacket& request, DnsQuestion question)
+{
+    DnsPacket response = make_base_response(request);
+
+    response.header.rescode = ResultCode::servfail;
+    response.questions.push_back(std::move(question));
+
+    return response;
+}
+
+DnsPacket make_forwarded_response(const DnsPacket& request, DnsQuestion question,
+                                  DnsPacket upstream)
+{
+    DnsPacket response = make_base_response(request);
+
+    response.questions.push_back(std::move(question));
+    response.header.rescode = upstream.header.rescode;
+
+    response.answers = std::move(upstream.answers);
+    response.authorities = std::move(upstream.authorities);
+    response.resources = std::move(upstream.resources);
+
+    return response;
+}
 DnsServer::DnsServer(StubResolver resolver) : resolver_{std::move(resolver)} {}
 
 void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
@@ -64,46 +108,47 @@ void DnsServer::handle_query(int socket_fd) const
     // recieve packet
     // prepare empty storage for packet bytes
     PacketBuffer request_packet{};
+
     // prepare empty storage for client address
     sockaddr_storage client_addr{};
+
     // block/wait until a UDP DNS query arrives
     socklen_t client_addr_len = sizeof(client_addr);
+
     // recvfrom() fills the packet buffer with the bytes
     const ssize_t bytes_recieved =
         recvfrom(socket_fd, request_packet.data(), PacketBuffer::max_size, 0,
                  reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len);
+
     // recvfrom() fills the client_addr with the senders address
     // check for recieve errors
     if (bytes_recieved < 0)
     {
         throw_errno_error("recvfrom() failed...");
     }
+
     // tell PacketBuffer how many bytes are valid
     request_packet.set_size(static_cast<std::size_t>(bytes_recieved));
+
     // reset cursor to the beginning
     request_packet.seek(0);
+
     // now packet is ready to decode
     // decode packet
     DnsPacket request{};
     request.decode_from_buffer(request_packet);
+
     // build response
-    //
-    // create empty DNS response packet
     DnsPacket response{};
-    // make id match the clients request id
-    response.header.id = request.header.id;
-    response.header.response = true;
-    response.header.recursion_desired = request.header.recursion_desired;
-    response.header.recursion_available = true;
-    // mark it as the response
+
     // if request is malformed: return FORMERR
     if (!request_packet.ok())
     {
-        response.header.rescode = ResultCode::formerr;
+        response = make_formerr_response(request);
     }
     else if (request.questions.empty())
     {
-        response.header.rescode = ResultCode::formerr;
+        response = make_formerr_response(request);
     }
     else
     {
@@ -112,24 +157,24 @@ void DnsServer::handle_query(int socket_fd) const
 
         std::cout << "Recieved query: " << question.name << "\n";
 
-        response.questions.emplace_back(question);
-
         try
         {
+            // if request has a question, foward it upstream
             DnsPacket result = resolver_.lookup(question.name, question.qtype);
 
-            response.header.rescode = result.header.rescode;
-            response.answers = std::move(result.answers);
-            response.authorities = std::move(result.authorities);
-            response.resources = std::move(result.resources);
+            // copy upstream answers in reponse
+            response = make_forwarded_response(request, std::move(question), std::move(result));
         }
         catch (const std::exception& error)
         {
             std::cerr << "Upstream lookup failed: " << error.what() << "\n";
-            response.header.rescode = ResultCode::servfail;
+
+            // if upstream fails. return SERVFAIL
+            response = make_servfail_response(request, std::move(question));
         }
     }
 
+    // serialize response into bytes
     PacketBuffer response_buffer{};
     response.write_to_buffer(response_buffer);
 
@@ -138,16 +183,13 @@ void DnsServer::handle_query(int socket_fd) const
         throw std::runtime_error{"failed to write DNS reponse packet"};
     }
 
-    // if request has a question, foward it upstream
-    // copy upstream answers in reponse
-    // if upstream fails. return SERVFAIL
-    // serialize response into bytes
     // send response
     const std::size_t bytes_to_send{response_buffer.position()};
 
     const ssize_t bytes_sent{sendto(socket_fd, response_buffer.data(), bytes_to_send, 0,
                                     reinterpret_cast<const sockaddr*>(&client_addr),
                                     client_addr_len)};
+
     if (bytes_sent < 0)
     {
         throw_errno_error("sendto() failed");
