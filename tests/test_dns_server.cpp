@@ -98,7 +98,7 @@ TEST(DnsServerTest, MakeForwardedResponsePreservesClientIdButCopiesUpstreamRecor
     answer.addr = std::array<std::uint8_t, 4>{93, 184, 216, 34};
     answer.ttl = 300;
 
-    upstream.answers.push_back(answer);
+    upstream.answers.emplace_back(answer);
 
     DnsPacket response = make_forwarded_response(request, std::move(question), std::move(upstream));
 

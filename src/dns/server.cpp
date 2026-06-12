@@ -40,7 +40,7 @@ DnsPacket make_servfail_response(const DnsPacket& request, DnsQuestion question)
     DnsPacket response = make_base_response(request);
 
     response.header.rescode = ResultCode::servfail;
-    response.questions.push_back(std::move(question));
+    response.questions.emplace_back(std::move(question));
 
     return response;
 }
@@ -50,7 +50,7 @@ DnsPacket make_forwarded_response(const DnsPacket& request, DnsQuestion question
 {
     DnsPacket response = make_base_response(request);
 
-    response.questions.push_back(std::move(question));
+    response.questions.emplace_back(std::move(question));
     response.header.rescode = upstream.header.rescode;
 
     response.answers = std::move(upstream.answers);
@@ -59,7 +59,15 @@ DnsPacket make_forwarded_response(const DnsPacket& request, DnsQuestion question
 
     return response;
 }
-DnsServer::DnsServer(StubResolver resolver) : resolver_{std::move(resolver)} {}
+DnsServer::DnsServer(ServerConfig config, StubResolver resolver)
+    : config_{std::move(config)}, resolver_{std::move(resolver)}
+{
+}
+
+void DnsServer::run() const
+{
+    run(config_.bind_ip, config_.port);
+}
 
 void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
 {

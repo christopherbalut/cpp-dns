@@ -7,7 +7,7 @@ int main()
     try
     {
         dns::DnsServer server{};
-        server.run("0.0.0.0", 2053);
+        server.run();
     }
     catch (const std::exception& error)
     {

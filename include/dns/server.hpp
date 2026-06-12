@@ -8,6 +8,12 @@
 namespace dns
 {
 
+struct ServerConfig
+{
+    std::string bind_ip{"0.0.0.0"};
+    std::uint16_t port{2053};
+};
+
 DnsPacket make_base_response(const DnsPacket& request);
 
 DnsPacket make_formerr_response(const DnsPacket& request);
@@ -19,13 +25,15 @@ DnsPacket make_forwarded_response(const DnsPacket& request, DnsQuestion question
 class DnsServer
 {
   public:
-    explicit DnsServer(StubResolver resolver = StubResolver{});
+    explicit DnsServer(ServerConfig config = {}, StubResolver resolver = StubResolver{});
 
-    void run(std::string_view bind_ip = "0.0.0.0", std::uint16_t port = 2053) const;
+    void run() const;
+    void run(std::string_view bind_ip, std::uint16_t port) const;
 
   private:
     void handle_query(int socket_fd) const;
 
+    ServerConfig config_;
     StubResolver resolver_;
 };
 } // namespace dns
