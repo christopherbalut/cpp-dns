@@ -17,6 +17,7 @@ add_library(cpp_dns
     src/dns/stub_resolver.cpp
     src/dns/server.cpp
     src/dns/socket_utils.cpp
+    src/dns/server_stats.cpp
 )
 
 target_include_directories(cpp_dns
