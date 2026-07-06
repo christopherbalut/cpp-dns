@@ -67,6 +67,7 @@ if (BUILD_TESTING)
         tests/test_result_code.cpp
         tests/test_sanity_check.cpp
         tests/test_dns_server.cpp
+        tests/test_server_stats.cpp
     )
 
     target_link_libraries(dns_tests
