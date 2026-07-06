@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 
 namespace dns
 {
@@ -26,6 +27,7 @@ class ServerStatsCounter
     [[nodiscard]] ServerStats snapshot() const;
 
   private:
+    mutable std::mutex mutex_;
     ServerStats stats_{};
 };
 } // namespace dns
