@@ -1,17 +1,20 @@
 #include "dns/server.hpp"
 #include "dns/buffer.hpp"
 #include "dns/packet.hpp"
+#include "dns/server_stats.hpp"
 #include "dns/socket_utils.hpp"
 #include "dns/types.hpp"
 
 #include <arpa/inet.h>
+#include <exception>
 #include <iostream>
 #include <netinet/in.h>
-#include <netinet/ip.h>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <utility>
 
 namespace dns
 {
@@ -135,6 +138,8 @@ void DnsServer::handle_query(int socket_fd) const
         throw_errno_error("recvfrom() failed...");
     }
 
+    stats_.record_query_received();
+
     // tell PacketBuffer how many bytes are valid
     request_packet.set_size(static_cast<std::size_t>(bytes_recieved));
 
@@ -149,13 +154,16 @@ void DnsServer::handle_query(int socket_fd) const
     // build response
     DnsPacket response{};
 
-    // if request is malformed: return FORMERR
+    // if request is malformed: return formerr
     if (!request_packet.ok())
     {
+        stats_.record_formerr_response();
         response = make_formerr_response(request);
     }
     else if (request.questions.empty())
     {
+
+        stats_.record_formerr_response();
         response = make_formerr_response(request);
     }
     else
@@ -168,6 +176,7 @@ void DnsServer::handle_query(int socket_fd) const
         try
         {
             // if request has a question, foward it upstream
+            stats_.record_query_forwarded();
             DnsPacket result = resolver_.lookup(question.name, question.qtype);
 
             // copy upstream answers in reponse
@@ -176,6 +185,9 @@ void DnsServer::handle_query(int socket_fd) const
         catch (const std::exception& error)
         {
             std::cerr << "Upstream lookup failed: " << error.what() << "\n";
+
+            stats_.record_servfail_response();
+            stats_.record_upstream_failure();
 
             // if upstream fails. return SERVFAIL
             response = make_servfail_response(request, std::move(question));

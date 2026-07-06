@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dns/server_stats.hpp"
 #include "dns/stub_resolver.hpp"
 
 #include <cstdint>
@@ -35,5 +36,6 @@ class DnsServer
 
     ServerConfig config_;
     StubResolver resolver_;
+    mutable ServerStatsCounter stats_;
 };
 } // namespace dns
