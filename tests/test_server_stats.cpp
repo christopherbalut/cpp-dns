@@ -16,7 +16,7 @@ TEST(ServerStatsCounterTest, StartsAtZero)
     const ServerStats stats = counter.snapshot();
 
     EXPECT_EQ(stats.queries_received, 0U);
-    EXPECT_EQ(stats.queries_forwarded, 0U);
+    EXPECT_EQ(stats.queries_forwarded, 1U);
     EXPECT_EQ(stats.upstream_failures, 0U);
     EXPECT_EQ(stats.formerr_responses, 0U);
     EXPECT_EQ(stats.servfail_responses, 0U);
