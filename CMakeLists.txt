@@ -18,6 +18,7 @@ add_library(cpp_dns
     src/dns/server.cpp
     src/dns/socket_utils.cpp
     src/dns/server_stats.cpp
+    src/dns/domain_name.cpp
 )
 
 target_include_directories(cpp_dns
@@ -68,6 +69,7 @@ if (BUILD_TESTING)
         tests/test_sanity_check.cpp
         tests/test_dns_server.cpp
         tests/test_server_stats.cpp
+        tests/test_domain_name.cpp
     )
 
     target_link_libraries(dns_tests
