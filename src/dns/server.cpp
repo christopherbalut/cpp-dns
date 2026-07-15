@@ -1,4 +1,5 @@
 #include "dns/server.hpp"
+#include "dns/blocklist.hpp"
 #include "dns/buffer.hpp"
 #include "dns/packet.hpp"
 #include "dns/server_stats.hpp"
@@ -62,9 +63,28 @@ DnsPacket make_forwarded_response(const DnsPacket& request, DnsQuestion question
 
     return response;
 }
-DnsServer::DnsServer(ServerConfig config, StubResolver resolver)
+
+DnsPacket make_blocked_response(const DnsPacket& request, DnsQuestion question)
+{
+    DnsPacket response = make_base_response(request);
+
+    response.header.rescode = ResultCode::nxdomain;
+    response.questions.emplace_back(std::move(question));
+
+    return response;
+}
+
+DnsServer::DnsServer(ServerConfig config, std::shared_ptr<ResolverInterface> resolver)
     : config_{std::move(config)}, resolver_{std::move(resolver)}
 {
+    if (resolver_ == nullptr)
+    {
+        throw std::invalid_argument("resolver cannot be null");
+    }
+    const BlocklistLoadResult result{blocklist_.load_from_file(config_.blocklist_path)};
+
+    std::cout << "Loaded " << result.domains_loaded << " blocked domains, skipped "
+              << result.lines_skipped << " lines\n";
 }
 
 void DnsServer::run() const
@@ -114,6 +134,47 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
     }
 }
 
+DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
+{
+    if (request.questions.empty())
+    {
+        stats_.record_formerr_response();
+        return make_formerr_response(request);
+    }
+
+    DnsQuestion question = std::move(request.questions.back());
+    request.questions.pop_back();
+
+    std::cout << "Received query: " << question.name << "\n";
+
+    if (blocklist_.contains(question.name))
+    {
+        stats_.record_blocked_queries();
+        return make_blocked_response(request, std::move(question));
+    }
+
+    try
+    {
+        // if request has a question, forward it upstream
+        stats_.record_query_forwarded();
+
+        DnsPacket result = resolver_->lookup(question.name, question.qtype);
+
+        // copy upstream answers in response
+        return make_forwarded_response(request, std::move(question), std::move(result));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Upstream lookup failed: " << error.what() << "\n";
+
+        stats_.record_servfail_response();
+        stats_.record_upstream_failure();
+
+        // if upstream fails, return SERVFAIL
+        return make_servfail_response(request, std::move(question));
+    }
+}
+
 void DnsServer::handle_query(int socket_fd) const
 {
     // recieve packet
@@ -160,38 +221,9 @@ void DnsServer::handle_query(int socket_fd) const
         stats_.record_formerr_response();
         response = make_formerr_response(request);
     }
-    else if (request.questions.empty())
-    {
-
-        stats_.record_formerr_response();
-        response = make_formerr_response(request);
-    }
     else
     {
-        DnsQuestion question = std::move(request.questions.back());
-        request.questions.pop_back();
-
-        std::cout << "Recieved query: " << question.name << "\n";
-
-        try
-        {
-            // if request has a question, foward it upstream
-            stats_.record_query_forwarded();
-            DnsPacket result = resolver_.lookup(question.name, question.qtype);
-
-            // copy upstream answers in reponse
-            response = make_forwarded_response(request, std::move(question), std::move(result));
-        }
-        catch (const std::exception& error)
-        {
-            std::cerr << "Upstream lookup failed: " << error.what() << "\n";
-
-            stats_.record_servfail_response();
-            stats_.record_upstream_failure();
-
-            // if upstream fails. return SERVFAIL
-            response = make_servfail_response(request, std::move(question));
-        }
+        response = make_response_for_request(std::move(request));
     }
 
     // serialize response into bytes

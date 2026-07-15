@@ -11,11 +11,76 @@
 #include <arpa/inet.h>
 #include <array>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <memory>
 #include <netinet/in.h>
+#include <stdexcept>
 #include <sys/socket.h>
+#include <utility>
 
 namespace dns
 {
+
+namespace
+{
+
+class FakeResolver : public ResolverInterface
+{
+  public:
+    DnsPacket response{};
+    bool should_throw{false};
+
+    mutable int lookup_count{};
+    mutable std::string last_name{};
+    mutable QueryType last_qtype{QueryType::Unknown};
+
+    DnsPacket lookup(std::string_view name, QueryType qtype) const override
+    {
+        ++lookup_count;
+        last_name = std::string{name};
+        last_qtype = qtype;
+
+        if (should_throw)
+        {
+            throw std::runtime_error{"fake upstream failure"};
+        }
+
+        return response;
+    }
+};
+
+DnsPacket make_request(std::string name, QueryType qtype)
+{
+    DnsPacket request{};
+    request.header.id = 1234;
+    request.header.recursion_desired = true;
+
+    DnsQuestion question{};
+    question.name = std::move(name);
+    question.qtype = qtype;
+
+    request.questions.push_back(std::move(question));
+
+    return request;
+}
+
+DnsPacket make_fake_upstream_response()
+{
+    DnsPacket upstream{};
+    upstream.header.rescode = ResultCode::noerror;
+
+    ARecord answer{};
+    answer.domain = "google.com";
+    answer.addr = std::array<std::uint8_t, 4>{1, 2, 3, 4};
+    answer.ttl = 300;
+
+    upstream.answers.emplace_back(answer);
+
+    return upstream;
+}
+
+} // namespace
 
 TEST(DnsServerTest, MakeBaseResponsePreservesClientIdAndSetsResponseFlags)
 {
@@ -149,5 +214,71 @@ TEST(DnsServerTest, RunThrowsWhenPortAlreadyInUse)
     DnsServer server{};
 
     EXPECT_THROW(server.run("127.0.0.1", used_port), std::runtime_error);
+}
+
+TEST(DnsServerFakeResolverTest, BlockedDomainDoesNotCallResolver)
+{
+    const auto path =
+        std::filesystem::temp_directory_path() / "cpp_dns_fake_resolver_blocklist.txt";
+
+    {
+        std::ofstream file{path};
+        ASSERT_TRUE(file);
+        file << "yahoo.com\n";
+    }
+
+    auto fake_resolver = std::make_shared<FakeResolver>();
+
+    ServerConfig config{};
+    config.blocklist_path = path.string();
+
+    DnsServer server{config, fake_resolver};
+
+    DnsPacket response = server.make_response_for_request(make_request("yahoo.com", QueryType::A));
+
+    EXPECT_EQ(response.header.rescode, ResultCode::nxdomain);
+    EXPECT_EQ(fake_resolver->lookup_count, 0);
+
+    std::filesystem::remove(path);
+}
+
+TEST(DnsServerFakeResolverTest, UnblockedDomainCallsResolver)
+{
+    auto fake_resolver = std::make_shared<FakeResolver>();
+    fake_resolver->response = make_fake_upstream_response();
+
+    ServerConfig config{};
+    config.blocklist_path = "";
+
+    DnsServer server{config, fake_resolver};
+
+    DnsPacket response = server.make_response_for_request(make_request("google.com", QueryType::A));
+
+    EXPECT_EQ(fake_resolver->lookup_count, 1);
+    EXPECT_EQ(fake_resolver->last_name, "google.com");
+    EXPECT_EQ(fake_resolver->last_qtype, QueryType::A);
+
+    EXPECT_EQ(response.header.rescode, ResultCode::noerror);
+    ASSERT_EQ(response.answers.size(), 1U);
+}
+
+TEST(DnsServerFakeResolverTest, ResolverFailureReturnsServfail)
+{
+    auto fake_resolver = std::make_shared<FakeResolver>();
+    fake_resolver->should_throw = true;
+
+    ServerConfig config{};
+    config.blocklist_path = "";
+
+    DnsServer server{config, fake_resolver};
+
+    DnsPacket response = server.make_response_for_request(make_request("google.com", QueryType::A));
+
+    EXPECT_EQ(fake_resolver->lookup_count, 1);
+    EXPECT_EQ(response.header.rescode, ResultCode::servfail);
+
+    ASSERT_EQ(response.questions.size(), 1U);
+    EXPECT_EQ(response.questions[0].name, "google.com");
+    EXPECT_EQ(response.questions[0].qtype, QueryType::A);
 }
 } // namespace dns
