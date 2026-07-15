@@ -30,4 +30,16 @@ TEST(DomainNameTest, HandlesEmptyDomain)
     EXPECT_EQ(normalize_domain(""), "");
 }
 
+TEST(DomainNameTest, TrimsAsciiWhitespace)
+{
+    EXPECT_EQ(trim_ascii("   yahoo.com   "), "yahoo.com");
+    EXPECT_EQ(trim_ascii("\tyahoo.com\n"), "yahoo.com");
+    EXPECT_EQ(trim_ascii(""), "");
+    EXPECT_EQ(trim_ascii("   "), "");
+}
+
+TEST(DomainNameTest, NormalizeDomainTrimsWhitespace)
+{
+    EXPECT_EQ(normalize_domain("   Yahoo.COM.   "), "yahoo.com");
+}
 } // namespace dns
