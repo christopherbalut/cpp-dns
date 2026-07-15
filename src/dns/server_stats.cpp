@@ -35,6 +35,11 @@ void ServerStatsCounter::record_servfail_response()
     ++stats_.servfail_responses;
 }
 
+void ServerStatsCounter::record_blocked_queries()
+{
+    std::lock_guard<std::mutex> lock{mutex_};
+    ++stats_.blocked_queries;
+}
 ServerStats ServerStatsCounter::snapshot() const
 {
 

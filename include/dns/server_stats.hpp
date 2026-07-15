@@ -12,6 +12,7 @@ struct ServerStats
     std::uint64_t upstream_failures{};
     std::uint64_t formerr_responses{};
     std::uint64_t servfail_responses{};
+    std::uint64_t blocked_queries{};
 };
 
 class ServerStatsCounter
@@ -23,6 +24,7 @@ class ServerStatsCounter
     void record_upstream_failure();
     void record_formerr_response();
     void record_servfail_response();
+    void record_blocked_queries();
 
     [[nodiscard]] ServerStats snapshot() const;
 
