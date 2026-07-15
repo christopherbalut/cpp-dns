@@ -19,6 +19,8 @@ add_library(cpp_dns
     src/dns/socket_utils.cpp
     src/dns/server_stats.cpp
     src/dns/domain_name.cpp
+    src/dns/blocklist.cpp
+    src/dns/config_parser.cpp
 )
 
 target_include_directories(cpp_dns
@@ -70,6 +72,8 @@ if (BUILD_TESTING)
         tests/test_dns_server.cpp
         tests/test_server_stats.cpp
         tests/test_domain_name.cpp
+        tests/test_blocklist.cpp
+
     )
 
     target_link_libraries(dns_tests
@@ -87,4 +91,11 @@ if (BUILD_TESTING)
     )
 
     gtest_discover_tests(dns_tests)
+endif()
+
+option(ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+
+if(ENABLE_TSAN)
+    add_compile_options(-fsanitize=thread -g)
+    add_link_options(-fsanitize=thread)
 endif()
