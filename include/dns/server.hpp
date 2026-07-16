@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <gtest/gtest_prod.h>
 #include <memory>
+#include <stop_token>
 #include <string_view>
 
 namespace dns
@@ -44,6 +45,7 @@ class DnsServer
   private:
     DnsPacket make_response_for_request(DnsPacket request) const;
     void handle_query(int socket_fd) const;
+    void log_stats_periodically(std::stop_token& stop_token) const;
 
     ServerConfig config_;
     std::shared_ptr<ResolverInterface> resolver_;

@@ -7,14 +7,17 @@
 #include "dns/types.hpp"
 
 #include <arpa/inet.h>
+#include <chrono>
 #include <exception>
 #include <iostream>
 #include <netinet/in.h>
 #include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <thread>
 #include <utility>
 
 namespace dns
@@ -120,6 +123,9 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
 
     std::cout << "DNS Server listening on " << bind_ip << ':' << port << "\n";
 
+    std::jthread stats_logger{[this](std::stop_token stop_token)
+                              { log_stats_periodically(stop_token); }};
+
     // loop call handle_query
     while (true)
     {
@@ -131,6 +137,20 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
         {
             std::cerr << "An error occurred while handle query: " << error.what() << "\n";
         }
+    }
+}
+
+void DnsServer::log_stats_periodically(std::stop_token& stop_token) const
+{
+    while (!stop_token.stop_requested())
+    {
+        std::this_thread::sleep_for(std::chrono::seconds{5});
+
+        const ServerStats stats = stats_.snapshot();
+
+        std::cout << "[stats] received=" << stats.queries_received
+                  << " forwarded=" << stats.queries_forwarded
+                  << " blocked=" << stats.blocked_queries << "\n";
     }
 }
 
