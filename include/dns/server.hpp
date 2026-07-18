@@ -45,7 +45,7 @@ class DnsServer
   private:
     DnsPacket make_response_for_request(DnsPacket request) const;
     void handle_query(int socket_fd) const;
-    void log_stats_periodically(std::stop_token& stop_token) const;
+    void log_stats_periodically(const std::stop_token& stop_token) const;
 
     ServerConfig config_;
     std::shared_ptr<ResolverInterface> resolver_;

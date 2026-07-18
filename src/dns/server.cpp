@@ -140,7 +140,7 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
     }
 }
 
-void DnsServer::log_stats_periodically(std::stop_token& stop_token) const
+void DnsServer::log_stats_periodically(const std::stop_token& stop_token) const
 {
     while (!stop_token.stop_requested())
     {
@@ -197,7 +197,7 @@ DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
 
 void DnsServer::handle_query(int socket_fd) const
 {
-    // recieve packet
+    // receive packet
     // prepare empty storage for packet bytes
     PacketBuffer request_packet{};
 
@@ -208,13 +208,13 @@ void DnsServer::handle_query(int socket_fd) const
     socklen_t client_addr_len = sizeof(client_addr);
 
     // recvfrom() fills the packet buffer with the bytes
-    const ssize_t bytes_recieved =
+    const ssize_t bytes_received =
         recvfrom(socket_fd, request_packet.data(), PacketBuffer::max_size, 0,
                  reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len);
 
-    // recvfrom() fills the client_addr with the senders address
-    // check for recieve errors
-    if (bytes_recieved < 0)
+    // recvfrom() fills the client_addr with the sender's address
+    // check for receive errors
+    if (bytes_received < 0)
     {
         throw_errno_error("recvfrom() failed...");
     }
@@ -222,54 +222,68 @@ void DnsServer::handle_query(int socket_fd) const
     stats_.record_query_received();
 
     // tell PacketBuffer how many bytes are valid
-    request_packet.set_size(static_cast<std::size_t>(bytes_recieved));
+    request_packet.set_size(static_cast<std::size_t>(bytes_received));
 
     // reset cursor to the beginning
     request_packet.seek(0);
 
-    // now packet is ready to decode
-    // decode packet
-    DnsPacket request{};
-    request.decode_from_buffer(request_packet);
+    // process the query on a separate worker thread
+    std::thread worker{
+        [this, socket_fd, request_packet = std::move(request_packet), client_addr,
+         client_addr_len]() mutable
+        {
+            try
+            {
+                // decode packet
+                DnsPacket request{};
+                request.decode_from_buffer(request_packet);
 
-    // build response
-    DnsPacket response{};
+                // build response
+                DnsPacket response{};
 
-    // if request is malformed: return formerr
-    if (!request_packet.ok())
-    {
-        stats_.record_formerr_response();
-        response = make_formerr_response(request);
-    }
-    else
-    {
-        response = make_response_for_request(std::move(request));
-    }
+                // if request is malformed: return formerr
+                if (!request_packet.ok())
+                {
+                    stats_.record_formerr_response();
+                    response = make_formerr_response(request);
+                }
+                else
+                {
+                    response = make_response_for_request(std::move(request));
+                }
 
-    // serialize response into bytes
-    PacketBuffer response_buffer{};
-    response.write_to_buffer(response_buffer);
+                // serialize response into bytes
+                PacketBuffer response_buffer{};
+                response.write_to_buffer(response_buffer);
 
-    if (!response_buffer.ok())
-    {
-        throw std::runtime_error{"failed to write DNS reponse packet"};
-    }
+                if (!response_buffer.ok())
+                {
+                    throw std::runtime_error{"failed to write DNS response packet"};
+                }
 
-    // send response
-    const std::size_t bytes_to_send{response_buffer.position()};
+                // send response
+                const std::size_t bytes_to_send{response_buffer.position()};
 
-    const ssize_t bytes_sent{sendto(socket_fd, response_buffer.data(), bytes_to_send, 0,
-                                    reinterpret_cast<const sockaddr*>(&client_addr),
-                                    client_addr_len)};
+                const ssize_t bytes_sent{sendto(socket_fd, response_buffer.data(), bytes_to_send, 0,
+                                                reinterpret_cast<const sockaddr*>(&client_addr),
+                                                client_addr_len)};
 
-    if (bytes_sent < 0)
-    {
-        throw_errno_error("sendto() failed");
-    }
+                if (bytes_sent < 0)
+                {
+                    throw_errno_error("sendto() failed");
+                }
 
-    if (static_cast<std::size_t>(bytes_sent) != bytes_to_send)
-    {
-        throw std::runtime_error{"sendto() sent fewer bytes than expected"};
-    }
+                if (static_cast<std::size_t>(bytes_sent) != bytes_to_send)
+                {
+                    throw std::runtime_error{"sendto() sent fewer bytes than expected"};
+                }
+            }
+            catch (const std::exception& error)
+            {
+                std::cerr << "Failed to process query: " << error.what() << "\n";
+            }
+        }};
+
+    worker.detach();
 }
 } // namespace dns
