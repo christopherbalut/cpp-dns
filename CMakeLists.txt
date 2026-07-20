@@ -21,6 +21,7 @@ add_library(cpp_dns
     src/dns/domain_name.cpp
     src/dns/blocklist.cpp
     src/dns/config_parser.cpp
+    src/dns/thread_pool.cpp
 )
 
 target_include_directories(cpp_dns
@@ -73,7 +74,7 @@ if (BUILD_TESTING)
         tests/test_server_stats.cpp
         tests/test_domain_name.cpp
         tests/test_blocklist.cpp
-
+        tests/test_thread_pool.cpp
     )
 
     target_link_libraries(dns_tests
