@@ -5,6 +5,7 @@
 #include "dns/resolver_interface.hpp"
 #include "dns/server_stats.hpp"
 #include "dns/stub_resolver.hpp"
+#include "dns/thread_pool.hpp"
 
 #include <cstdint>
 #include <gtest/gtest_prod.h>
@@ -16,11 +17,13 @@ namespace dns
 {
 
 inline constexpr std::uint16_t default_server_port{2053};
+inline constexpr std::size_t default_worker_count{4};
 struct ServerConfig
 {
     std::string bind_ip{"0.0.0.0"};
     std::uint16_t port{default_server_port};
     std::string blocklist_path{"blocklist.txt"};
+    std::size_t worker_count{default_worker_count};
 };
 
 DnsPacket make_base_response(const DnsPacket& request);
@@ -50,6 +53,7 @@ class DnsServer
     ServerConfig config_;
     std::shared_ptr<ResolverInterface> resolver_;
     Blocklist blocklist_;
+    mutable ThreadPool thread_pool_;
     mutable ServerStatsCounter stats_;
 
     FRIEND_TEST(DnsServerFakeResolverTest, BlockedDomainDoesNotCallResolver);

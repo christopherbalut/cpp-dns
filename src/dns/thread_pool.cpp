@@ -63,34 +63,38 @@ void ThreadPool::worker_loop(std::stop_token stop_token)
     // unlock queue
     // run job
     // repeat
-    std::function<void()> job; // declare to run
-
+    while (!stop_token.stop_requested())
     {
-        std::unique_lock<std::mutex> lock{mutex_};
-        // wait until there is a job
-        job_available_.wait(lock, std::move(stop_token),
-                            [this] { return !jobs_.empty() || !accepting_jobs_; });
 
-        if (jobs_.empty())
+        std::function<void()> job; // declare to run
+
         {
-            return;
+            std::unique_lock<std::mutex> lock{mutex_};
+            // wait until there is a job
+            job_available_.wait(lock, stop_token,
+                                [this] { return !jobs_.empty() || !accepting_jobs_; });
+
+            if (jobs_.empty())
+            {
+                return;
+            }
+
+            job = std::move(jobs_.front());
+            jobs_.pop();
         }
 
-        job = std::move(jobs_.front());
-        jobs_.pop();
-    }
-
-    try // run the job
-    {
-        job();
-    }
-    catch (const std::exception& error)
-    {
-        std::cerr << "Thread Pool job failed: " << error.what() << "\n";
-    }
-    catch (...)
-    {
-        std::cerr << "ThreadPool job failed with unknown exception" << "\n";
+        try // run the job
+        {
+            job();
+        }
+        catch (const std::exception& error)
+        {
+            std::cerr << "Thread Pool job failed: " << error.what() << "\n";
+        }
+        catch (...)
+        {
+            std::cerr << "ThreadPool job failed with unknown exception" << "\n";
+        }
     }
 }
 } // namespace dns

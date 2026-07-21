@@ -78,7 +78,7 @@ DnsPacket make_blocked_response(const DnsPacket& request, DnsQuestion question)
 }
 
 DnsServer::DnsServer(ServerConfig config, std::shared_ptr<ResolverInterface> resolver)
-    : config_{std::move(config)}, resolver_{std::move(resolver)}
+    : config_{std::move(config)}, resolver_{std::move(resolver)}, thread_pool_{config_.worker_count}
 {
     if (resolver_ == nullptr)
     {
@@ -228,20 +228,16 @@ void DnsServer::handle_query(int socket_fd) const
     request_packet.seek(0);
 
     // process the query on a separate worker thread
-    std::thread worker{
-        [this, socket_fd, request_packet = std::move(request_packet), client_addr,
-         client_addr_len]() mutable
+    thread_pool_.submit(
+        [this, socket_fd, request_packet, client_addr, client_addr_len]() mutable
         {
             try
             {
-                // decode packet
                 DnsPacket request{};
                 request.decode_from_buffer(request_packet);
 
-                // build response
                 DnsPacket response{};
 
-                // if request is malformed: return formerr
                 if (!request_packet.ok())
                 {
                     stats_.record_formerr_response();
@@ -252,7 +248,6 @@ void DnsServer::handle_query(int socket_fd) const
                     response = make_response_for_request(std::move(request));
                 }
 
-                // serialize response into bytes
                 PacketBuffer response_buffer{};
                 response.write_to_buffer(response_buffer);
 
@@ -261,7 +256,6 @@ void DnsServer::handle_query(int socket_fd) const
                     throw std::runtime_error{"failed to write DNS response packet"};
                 }
 
-                // send response
                 const std::size_t bytes_to_send{response_buffer.position()};
 
                 const ssize_t bytes_sent{sendto(socket_fd, response_buffer.data(), bytes_to_send, 0,
@@ -282,8 +276,6 @@ void DnsServer::handle_query(int socket_fd) const
             {
                 std::cerr << "Failed to process query: " << error.what() << "\n";
             }
-        }};
-
-    worker.detach();
+        });
 }
 } // namespace dns
