@@ -1,9 +1,11 @@
 #include "dns/config_parser.hpp"
 #include <charconv>
+#include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 namespace dns
 {
@@ -31,7 +33,28 @@ std::uint16_t parse_port(std::string_view text)
     return static_cast<std::uint16_t>(port);
 }
 
-std::string_view require_value(std::span<char*> args, size_t& index, std::string_view option)
+std::size_t parse_worker_count(std::string_view text)
+{
+    std::size_t worker_count{}; // this is unsigned so it cannot be less than 0 by default
+
+    const char* begin{text.data()};
+    const char* end{text.data() + text.size()};
+
+    const auto [ptr, error] = std::from_chars(begin, end, worker_count);
+
+    if (error != std::errc{} || ptr != end)
+    {
+        throw std::invalid_argument{"invalid worker count: " + std::string{text}};
+    }
+
+    if (worker_count == 0)
+    {
+        throw std::invalid_argument{"worker_count cannot be less or equal 0"};
+    }
+    return worker_count;
+}
+
+std::string_view require_value(std::span<char*> args, std::size_t& index, std::string_view option)
 {
     if (index + 1 >= args.size())
     {
@@ -63,6 +86,10 @@ ServerConfig parse_server_config(std::span<char*> args)
         else if (arg == "--blocklist")
         {
             config.blocklist_path = std::string{require_value(args, i, arg)};
+        }
+        else if (arg == "--workers")
+        {
+            config.worker_count = parse_worker_count(require_value(args, i, arg));
         }
         else
         {
