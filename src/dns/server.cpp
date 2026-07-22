@@ -166,8 +166,6 @@ DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
     DnsQuestion question = std::move(request.questions.back());
     request.questions.pop_back();
 
-    std::cout << "Received query: " << question.name << "\n";
-
     if (blocklist_.contains(question.name))
     {
         stats_.record_blocked_queries();
