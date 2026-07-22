@@ -13,6 +13,8 @@ struct ServerStats
     std::uint64_t formerr_responses{};
     std::uint64_t servfail_responses{};
     std::uint64_t blocked_queries{};
+    std::uint64_t cache_hits{};
+    std::uint64_t cache_misses{};
 };
 
 class ServerStatsCounter
@@ -25,6 +27,8 @@ class ServerStatsCounter
     void record_formerr_response();
     void record_servfail_response();
     void record_blocked_queries();
+    void record_cache_hit();
+    void record_cache_miss();
 
     [[nodiscard]] ServerStats snapshot() const;
 

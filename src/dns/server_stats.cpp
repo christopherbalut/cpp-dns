@@ -40,6 +40,19 @@ void ServerStatsCounter::record_blocked_queries()
     std::lock_guard<std::mutex> lock{mutex_};
     ++stats_.blocked_queries;
 }
+
+void ServerStatsCounter::record_cache_hit()
+{
+    std::lock_guard<std::mutex> lock{mutex_};
+    ++stats_.cache_hits;
+}
+
+void ServerStatsCounter::record_cache_miss()
+{
+    std::lock_guard<std::mutex> lock{mutex_};
+    ++stats_.cache_misses;
+}
+
 ServerStats ServerStatsCounter::snapshot() const
 {
 
