@@ -117,4 +117,27 @@ TEST(ServerStatsCounterTest, HandlesConcurrentMixedUpdates)
     EXPECT_EQ(stats.servfail_responses, expected);
 }
 
+TEST(ServerStatsCounterTest, RecordsCacheHits)
+{
+    ServerStatsCounter counter{};
+
+    counter.record_cache_hit();
+    counter.record_cache_hit();
+
+    const ServerStats stats{counter.snapshot()};
+
+    EXPECT_EQ(stats.cache_hits, 2U);
+}
+
+TEST(ServerStatsCounterTest, RecordsCacheMisses)
+{
+    ServerStatsCounter counter{};
+
+    counter.record_cache_miss();
+
+    const ServerStats stats{counter.snapshot()};
+
+    EXPECT_EQ(stats.cache_misses, 1U);
+}
+
 } // namespace dns
