@@ -150,7 +150,8 @@ void DnsServer::log_stats_periodically(const std::stop_token& stop_token) const
 
         std::cout << "[stats] received=" << stats.queries_received
                   << " forwarded=" << stats.queries_forwarded
-                  << " blocked=" << stats.blocked_queries << "\n";
+                  << " blocked=" << stats.blocked_queries << " cache_hits=" << stats.cache_hits
+                  << " cache_misses=" << stats.cache_misses << "\n";
     }
 }
 
@@ -173,12 +174,22 @@ DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
         return make_blocked_response(request, std::move(question));
     }
 
+    if (auto cached = cache_.lookup(question.name, question.qtype))
+    {
+        stats_.record_cache_hit();
+        return make_forwarded_response(request, std::move(question), std::move(*cached));
+    }
+
+    stats_.record_cache_miss();
+
     try
     {
         // if request has a question, forward it upstream
         stats_.record_query_forwarded();
 
         DnsPacket result = resolver_->lookup(question.name, question.qtype);
+
+        cache_.insert(question.name, question.qtype, result);
 
         // copy upstream answers in response
         return make_forwarded_response(request, std::move(question), std::move(result));

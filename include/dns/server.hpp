@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dns/blocklist.hpp"
+#include "dns/cache.hpp"
 #include "dns/packet.hpp"
 #include "dns/resolver_interface.hpp"
 #include "dns/server_stats.hpp"
@@ -53,6 +54,8 @@ class DnsServer
     ServerConfig config_;
     std::shared_ptr<ResolverInterface> resolver_;
     Blocklist blocklist_;
+
+    mutable DnsCache cache_;
     mutable ThreadPool thread_pool_;
     mutable ServerStatsCounter stats_;
 
