@@ -77,6 +77,14 @@ void DnsCache::insert(std::string_view name, QueryType qtype, DnsPacket packet)
     entries_[std::move(key)] = std::move(entry);
 }
 
+void DnsCache::set_packet_ttl(DnsPacket& packet, std::uint32_t ttl)
+{
+    for (DnsRecord& record : packet.answers)
+    {
+        std::visit([ttl](auto& actual_record) { actual_record.ttl = ttl; }, record);
+    }
+}
+
 std::optional<DnsPacket> DnsCache::lookup(std::string_view name, QueryType qtype)
 {
     CacheKey key{make_key(name, qtype)};
@@ -97,7 +105,14 @@ std::optional<DnsPacket> DnsCache::lookup(std::string_view name, QueryType qtype
         return std::nullopt;
     }
 
-    return entry_it->second.packet;
+    const std::chrono::seconds remaining_ttl{
+        std::chrono::ceil<std::chrono::seconds>(entry_it->second.expires_at - now)};
+
+    DnsPacket packet{entry_it->second.packet};
+
+    set_packet_ttl(packet, static_cast<std::uint32_t>(remaining_ttl.count()));
+
+    return packet;
 }
 
 std::size_t DnsCache::size() const

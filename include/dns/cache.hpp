@@ -55,6 +55,8 @@ class DnsCache
 
     [[nodiscard]] static bool is_expired(const CacheEntry& entry, TimePoint now);
 
+    static void set_packet_ttl(DnsPacket& packet, std::uint32_t ttl);
+
     mutable std::mutex mutex_;
     std::unordered_map<CacheKey, CacheEntry, CacheKeyHash> entries_;
 };
