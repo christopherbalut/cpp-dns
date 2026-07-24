@@ -1,0 +1,13 @@
+[Unit]
+Description=cpp-dns local fowarding DNS server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cpp_dns_app --bind 127.0.0.1 --port 2053 --blocklist /etc/cpp-dns/blocklist.txt --workers 4
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
