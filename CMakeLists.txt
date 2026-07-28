@@ -24,6 +24,7 @@ add_library(cpp_dns
     src/dns/thread_pool.cpp
     src/dns/cache.cpp
     src/dns/shutdown.cpp
+    src/dns/config_file.cpp
 )
 
 target_include_directories(cpp_dns
@@ -78,6 +79,8 @@ if (BUILD_TESTING)
         tests/test_blocklist.cpp
         tests/test_thread_pool.cpp
         tests/test_cache.cpp
+        tests/test_config_file.cpp
+        tests/test_config_parser.cpp
     )
 
     target_link_libraries(dns_tests

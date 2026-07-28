@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <fstream>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -80,4 +81,36 @@ TEST(ConfigParserTest, ThrowsOnUnknownOption)
     EXPECT_THROW(parse_server_config(make_span(argv)), std::invalid_argument);
 }
 
+TEST(ConfigParserTest, CommandLineOverridesConfigFile)
+{
+    const std::filesystem::path path{"test-cpp-dns.conf"};
+
+    {
+        std::ofstream file{path};
+        file << "bind_ip=0.0.0.0\n";
+        file << "port=53\n";
+        file << "workers=4\n";
+    }
+
+    std::array<char, 12> program{"cpp_dns_app"};
+    std::array<char, 9> config_option{"--config"};
+    std::array<char, 18> config_path{"test-cpp-dns.conf"};
+    std::array<char, 7> port_option{"--port"};
+    std::array<char, 5> port_value{"2053"};
+    std::array<char, 10> workers_option{"--workers"};
+    std::array<char, 2> workers_value{"2"};
+
+    std::array<char*, 7> argv{
+        program.data(),    config_option.data(),  config_path.data(),   port_option.data(),
+        port_value.data(), workers_option.data(), workers_value.data(),
+    };
+
+    const dns::ServerConfig config{
+        dns::parse_server_config(std::span<char*>{argv.data(), argv.size()})};
+    EXPECT_EQ(config.bind_ip, "0.0.0.0");
+    EXPECT_EQ(config.port, 2053);
+    EXPECT_EQ(config.worker_count, 2U);
+
+    std::filesystem::remove(path);
+}
 } // namespace dns

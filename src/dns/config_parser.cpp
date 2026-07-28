@@ -1,4 +1,5 @@
 #include "dns/config_parser.hpp"
+#include "dns/config_file.hpp"
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -71,11 +72,26 @@ ServerConfig parse_server_config(std::span<char*> args)
 {
     ServerConfig config{};
 
-    for (std::size_t i{1}; i < args.size(); i++)
+    for (std::size_t i{1}; i < args.size(); ++i)
     {
         const std::string_view arg{args[i]};
 
-        if (arg == "--bind")
+        if (arg == "--config")
+        {
+            const std::string_view config_path{require_value(args, i, arg)};
+            config = load_config_file(std::filesystem::path{config_path});
+        }
+    }
+
+    for (std::size_t i{1}; i < args.size(); ++i)
+    {
+        const std::string_view arg{args[i]};
+
+        if (arg == "--config")
+        {
+            require_value(args, i, arg);
+        }
+        else if (arg == "--bind")
         {
             config.bind_ip = std::string{require_value(args, i, arg)};
         }
@@ -96,6 +112,7 @@ ServerConfig parse_server_config(std::span<char*> args)
             throw std::invalid_argument{"unknown option: " + std::string{arg}};
         }
     }
+
     return config;
 }
 
