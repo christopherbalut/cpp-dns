@@ -172,7 +172,8 @@ void DnsServer::log_stats_periodically(const std::stop_token& stop_token) const
         std::cout << "[stats] received=" << stats.queries_received
                   << " forwarded=" << stats.queries_forwarded
                   << " blocked=" << stats.blocked_queries << " cache_hits=" << stats.cache_hits
-                  << " cache_misses=" << stats.cache_misses << "\n";
+                  << " cache_misses=" << stats.cache_misses << "\n"
+                  << std::flush;
     }
 }
 
