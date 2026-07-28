@@ -3,10 +3,13 @@
 #include "dns/buffer.hpp"
 #include "dns/packet.hpp"
 #include "dns/server_stats.hpp"
+#include "dns/shutdown.hpp"
 #include "dns/socket_utils.hpp"
 #include "dns/types.hpp"
 
 #include <arpa/inet.h>
+#include <asm-generic/socket.h>
+#include <cerrno>
 #include <chrono>
 #include <exception>
 #include <iostream>
@@ -22,6 +25,20 @@
 
 namespace dns
 {
+
+constexpr timeval recieve_timeout{
+    .tv_sec = 1,
+    .tv_usec = 0,
+};
+
+void set_recieve_timeout(int socket_fd)
+{
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &recieve_timeout, sizeof(recieve_timeout)) <
+        0)
+    {
+        throw_errno_error("setsockopt(SO_RCVTIMEO) failed");
+    }
+}
 
 DnsPacket make_base_response(const DnsPacket& request)
 {
@@ -104,6 +121,8 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
         throw_errno_error("socket () failed, please  try again");
     }
 
+    set_recieve_timeout(socketfd.get());
+
     sockaddr_in server_addr{};
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
@@ -127,7 +146,7 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
                               { log_stats_periodically(stop_token); }};
 
     // loop call handle_query
-    while (true)
+    while (!shutdown_requested())
     {
         try
         {
@@ -138,6 +157,8 @@ void DnsServer::run(std::string_view bind_ip, std::uint16_t port) const
             std::cerr << "An error occurred while handle query: " << error.what() << "\n";
         }
     }
+
+    std::cout << "\nDNS server shutting down\n";
 }
 
 void DnsServer::log_stats_periodically(const std::stop_token& stop_token) const
@@ -225,6 +246,11 @@ void DnsServer::handle_query(int socket_fd) const
     // check for receive errors
     if (bytes_received < 0)
     {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+        {
+            return;
+        }
+
         throw_errno_error("recvfrom() failed...");
     }
 
