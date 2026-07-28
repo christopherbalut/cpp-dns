@@ -23,6 +23,7 @@ add_library(cpp_dns
     src/dns/config_parser.cpp
     src/dns/thread_pool.cpp
     src/dns/cache.cpp
+    src/dns/shutdown.cpp
 )
 
 target_include_directories(cpp_dns
