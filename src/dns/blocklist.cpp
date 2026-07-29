@@ -20,8 +20,29 @@ void Blocklist::add(std::string_view domain)
 
 bool Blocklist::contains(std::string_view domain) const
 {
-    const std::string normalized = normalize_domain(domain);
-    return blocked_domains_.contains(normalized);
+    std::string candidate = normalize_domain(domain);
+
+    if (candidate.empty())
+    {
+        return false;
+    }
+
+    while (true)
+    {
+        if (blocked_domains_.contains(candidate))
+        {
+            return true;
+        }
+
+        const std::size_t dot_position = candidate.find('.');
+
+        if (dot_position == std::string::npos)
+        {
+            return false;
+        }
+
+        candidate.erase(0, dot_position + 1);
+    }
 }
 
 std::size_t Blocklist::size() const

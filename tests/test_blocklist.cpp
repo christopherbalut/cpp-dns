@@ -76,4 +76,24 @@ TEST(BlocklistTest, LoadFromFileIgnoresWhitespaceCommentsAndDuplicates)
     std::filesystem::remove(path);
 }
 
+TEST(BlocklistTest, ContainsSubdomainOfBlockedDomain)
+{
+    dns::Blocklist blocklist{};
+
+    blocklist.add("yahoo.com");
+
+    EXPECT_TRUE(blocklist.contains("ads.yahoo.com"));
+    EXPECT_TRUE(blocklist.contains("www.yahoo.com"));
+    EXPECT_TRUE(blocklist.contains("tracker.ads.yahoo.com"));
+}
+
+TEST(BlocklistTest, DoesNotMatchPartialSuffix)
+{
+    dns::Blocklist blocklist{};
+
+    blocklist.add("yahoo.com");
+
+    EXPECT_FALSE(blocklist.contains("notyahoo.com"));
+    EXPECT_FALSE(blocklist.contains("fake-yahoo.com"));
+}
 } // namespace dns
