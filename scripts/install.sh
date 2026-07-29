@@ -7,11 +7,11 @@ sudo install -Dm755 build/cpp_dns_app /usr/local/bin/cpp_dns_app
 
 sudo mkdir -p /etc/cpp-dns
 
-if [! -f /etc/cpp-dns/config.conf ]; then
+if [ ! -f /etc/cpp-dns/config.conf ]; then
     sudo install -Dm644 packaging/config.conf /etc/cpp-dns/config.conf
 fi
 
-if [! -f /etc/cpp-dns/blocklist.txt ]; then
+if [ ! -f /etc/cpp-dns/blocklist.txt ]; then
     sudo install -Dm644 blocklist.txt /etc/cpp-dns/blocklist.txt
 fi
 
