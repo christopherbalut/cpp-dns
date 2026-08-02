@@ -15,6 +15,10 @@ if [ ! -f /etc/cpp-dns/blocklist.txt ]; then
     sudo install -Dm644 blocklist.txt /etc/cpp-dns/blocklist.txt
 fi
 
+if [ ! -f /etc/cpp-dns/allowlist.txt ]; then
+    sudo install -Dm644 allowlist.txt /etc/cpp-dns/allowlist.txt
+fi
+
 sudo install -Dm544 packaging/cpp-dns.service /etc/systemd/system/cpp-dns.service
 
 sudo systemctl daemon-reload

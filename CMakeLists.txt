@@ -25,6 +25,7 @@ add_library(cpp_dns
     src/dns/cache.cpp
     src/dns/shutdown.cpp
     src/dns/config_file.cpp
+    src/dns/allowlist.cpp
 )
 
 target_include_directories(cpp_dns

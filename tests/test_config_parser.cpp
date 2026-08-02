@@ -113,4 +113,22 @@ TEST(ConfigParserTest, CommandLineOverridesConfigFile)
 
     std::filesystem::remove(path);
 }
+
+TEST(ConfigParserTest, ParsesAllowlistOption)
+{
+    std::array<char, 12> program{"cpp_dns_app"};
+    std::array<char, 12> allowlist_option{"--allowlist"};
+    std::array<char, 14> allowlist_path{"allowlist.txt"};
+
+    std::array<char*, 3> argv{
+        program.data(),
+        allowlist_option.data(),
+        allowlist_path.data(),
+    };
+
+    const dns::ServerConfig config{
+        dns::parse_server_config(std::span<char*>{argv.data(), argv.size()})};
+
+    EXPECT_EQ(config.allowlist_path, "allowlist.txt");
+}
 } // namespace dns

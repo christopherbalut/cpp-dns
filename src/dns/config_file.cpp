@@ -80,6 +80,10 @@ void apply_config_value(ServerConfig& config, std::string_view key, std::string_
     {
         config.blocklist_path = std::string{value};
     }
+    else if (key == "allowlist_path")
+    {
+        config.allowlist_path = std::string{value};
+    }
     else if (key == "workers")
     {
         config.worker_count = parse_worker_count(value);

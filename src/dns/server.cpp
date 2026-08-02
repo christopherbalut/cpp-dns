@@ -1,4 +1,5 @@
 #include "dns/server.hpp"
+#include "dns/allowlist.hpp"
 #include "dns/blocklist.hpp"
 #include "dns/buffer.hpp"
 #include "dns/packet.hpp"
@@ -101,10 +102,16 @@ DnsServer::DnsServer(ServerConfig config, std::shared_ptr<ResolverInterface> res
     {
         throw std::invalid_argument("resolver cannot be null");
     }
+
     const BlocklistLoadResult result{blocklist_.load_from_file(config_.blocklist_path)};
 
     std::cout << "Loaded " << result.domains_loaded << " blocked domains, skipped "
               << result.lines_skipped << " lines\n";
+
+    const AllowlistLoadResult allowlist_result{allowlist_.load_from_file(config_.allowlist_path)};
+
+    std::cout << "Loaded " << allowlist_result.domains_loaded << " allowlist domains, skipped "
+              << allowlist_result.lines_skipped << " lines\n";
 }
 
 void DnsServer::run() const
@@ -188,7 +195,7 @@ DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
     DnsQuestion question = std::move(request.questions.back());
     request.questions.pop_back();
 
-    if (blocklist_.contains(question.name))
+    if (!allowlist_.contains(question.name) && blocklist_.contains(question.name))
     {
         stats_.record_blocked_queries();
         return make_blocked_response(request, std::move(question));

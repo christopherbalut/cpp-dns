@@ -78,3 +78,19 @@ TEST(ConfigFileTest, RejectsInvalidPort)
 
     std::filesystem::remove(path);
 }
+
+TEST(ConfigFileTest, LoadsAllowlistPath)
+{
+    const std::filesystem::path path{"test-cpp-dns.conf"};
+
+    {
+        std::ofstream file{path};
+        file << "allowlist_path=allowlist.txt\n";
+    }
+
+    const dns::ServerConfig config{dns::load_config_file(path)};
+
+    EXPECT_EQ(config.allowlist_path, "allowlist.txt");
+
+    std::filesystem::remove(path);
+}

@@ -80,6 +80,12 @@ DnsPacket make_fake_upstream_response()
     return upstream;
 }
 
+void write_test_domain_file(const std::filesystem::path& path, std::string_view contents)
+{
+    std::ofstream file{path};
+    file << contents;
+}
+
 } // namespace
 
 TEST(DnsServerTest, MakeBaseResponsePreservesClientIdAndSetsResponseFlags)
@@ -280,5 +286,71 @@ TEST(DnsServerFakeResolverTest, ResolverFailureReturnsServfail)
     ASSERT_EQ(response.questions.size(), 1U);
     EXPECT_EQ(response.questions[0].name, "google.com");
     EXPECT_EQ(response.questions[0].qtype, QueryType::A);
+}
+
+TEST(DnsServerTest, AllowlistOverridesBlocklist)
+{
+    const std::filesystem::path blocklist_path{"test-server-blocklist.txt"};
+    const std::filesystem::path allowlist_path{"test-server-allowlist.txt"};
+
+    write_test_domain_file(blocklist_path, "yahoo.com\n");
+    write_test_domain_file(allowlist_path, "mail.yahoo.com\n");
+
+    dns::ServerConfig config{};
+    config.blocklist_path = blocklist_path.string();
+    config.allowlist_path = allowlist_path.string();
+
+    auto resolver = std::make_shared<FakeResolver>();
+    dns::DnsServer server{config, resolver};
+
+    dns::DnsPacket request{};
+    request.header.id = 1234;
+    request.header.recursion_desired = true;
+    dns::DnsQuestion question{};
+    question.name = "mail.yahoo.com";
+    question.qtype = dns::QueryType::A;
+
+    request.questions.emplace_back(question);
+
+    const dns::DnsPacket response{server.make_response_for_request(std::move(request))};
+
+    EXPECT_EQ(response.header.rescode, dns::ResultCode::noerror);
+    EXPECT_EQ(response.questions.size(), 1U);
+
+    std::filesystem::remove(blocklist_path);
+    std::filesystem::remove(allowlist_path);
+}
+
+TEST(DnsServerTest, BlocklistStillBlocksNonAllowlistedSubdomain)
+{
+    const std::filesystem::path blocklist_path{"test-server-blocklist.txt"};
+    const std::filesystem::path allowlist_path{"test-server-allowlist.txt"};
+
+    write_test_domain_file(blocklist_path, "yahoo.com\n");
+    write_test_domain_file(allowlist_path, "mail.yahoo.com\n");
+
+    dns::ServerConfig config{};
+    config.blocklist_path = blocklist_path.string();
+    config.allowlist_path = allowlist_path.string();
+
+    auto resolver = std::make_shared<FakeResolver>();
+    dns::DnsServer server{config, resolver};
+
+    dns::DnsPacket request{};
+    request.header.id = 1234;
+    request.header.recursion_desired = true;
+    dns::DnsQuestion question{};
+    question.name = "ads.yahoo.com";
+    question.qtype = dns::QueryType::A;
+
+    request.questions.emplace_back(question);
+
+    const dns::DnsPacket response{server.make_response_for_request(std::move(request))};
+
+    EXPECT_EQ(response.header.rescode, dns::ResultCode::nxdomain);
+    EXPECT_EQ(response.questions.size(), 1U);
+
+    std::filesystem::remove(blocklist_path);
+    std::filesystem::remove(allowlist_path);
 }
 } // namespace dns

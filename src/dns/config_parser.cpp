@@ -103,6 +103,10 @@ ServerConfig parse_server_config(std::span<char*> args)
         {
             config.blocklist_path = std::string{require_value(args, i, arg)};
         }
+        else if (arg == "--allowlist")
+        {
+            config.allowlist_path = std::string{require_value(args, i, arg)};
+        }
         else if (arg == "--workers")
         {
             config.worker_count = parse_worker_count(require_value(args, i, arg));

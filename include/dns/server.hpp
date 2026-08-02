@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dns/allowlist.hpp"
 #include "dns/blocklist.hpp"
 #include "dns/cache.hpp"
 #include "dns/packet.hpp"
@@ -25,6 +26,7 @@ struct ServerConfig
     std::uint16_t port{default_server_port};
     std::string blocklist_path{"blocklist.txt"};
     std::size_t worker_count{default_worker_count};
+    std::string allowlist_path{"allowlist.txt"};
 };
 
 DnsPacket make_base_response(const DnsPacket& request);
@@ -54,6 +56,7 @@ class DnsServer
     ServerConfig config_;
     std::shared_ptr<ResolverInterface> resolver_;
     Blocklist blocklist_;
+    Allowlist allowlist_;
 
     mutable DnsCache cache_;
     mutable ThreadPool thread_pool_;
@@ -62,5 +65,7 @@ class DnsServer
     FRIEND_TEST(DnsServerFakeResolverTest, BlockedDomainDoesNotCallResolver);
     FRIEND_TEST(DnsServerFakeResolverTest, UnblockedDomainCallsResolver);
     FRIEND_TEST(DnsServerFakeResolverTest, ResolverFailureReturnsServfail);
+    FRIEND_TEST(DnsServerTest, AllowlistOverridesBlocklist);
+    FRIEND_TEST(DnsServerTest, BlocklistStillBlocksNonAllowlistedSubdomain);
 };
 } // namespace dns
