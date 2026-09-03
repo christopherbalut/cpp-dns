@@ -103,10 +103,20 @@ DnsServer::DnsServer(ServerConfig config, std::shared_ptr<ResolverInterface> res
         throw std::invalid_argument("resolver cannot be null");
     }
 
-    const BlocklistLoadResult result{blocklist_.load_from_file(config_.blocklist_path)};
+    std::size_t total_blocked_domains_loaded{0};
+    std::size_t total_blocklist_lines_skipped{0};
 
-    std::cout << "Loaded " << result.domains_loaded << " blocked domains, skipped "
-              << result.lines_skipped << " lines\n";
+    for (const std::string& blocklist_path : config_.blocklist_paths)
+    {
+
+        const BlocklistLoadResult result{blocklist_.load_from_file(blocklist_path)};
+
+        total_blocked_domains_loaded += result.domains_loaded;
+        total_blocklist_lines_skipped += result.lines_skipped;
+    }
+
+    std::cout << "Loaded " << total_blocked_domains_loaded << " blocked domains, skipped "
+              << total_blocklist_lines_skipped << " lines\n";
 
     const AllowlistLoadResult allowlist_result{allowlist_.load_from_file(config_.allowlist_path)};
 

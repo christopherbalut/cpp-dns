@@ -101,7 +101,7 @@ ServerConfig parse_server_config(std::span<char*> args)
         }
         else if (arg == "--blocklist")
         {
-            config.blocklist_path = std::string{require_value(args, i, arg)};
+            config.blocklist_paths = {std::string{require_value(args, i, arg)}};
         }
         else if (arg == "--allowlist")
         {

@@ -78,7 +78,7 @@ void apply_config_value(ServerConfig& config, std::string_view key, std::string_
     }
     else if (key == "blocklist_path")
     {
-        config.blocklist_path = std::string{value};
+        config.blocklist_paths = {std::string{value}};
     }
     else if (key == "allowlist_path")
     {

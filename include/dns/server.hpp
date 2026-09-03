@@ -14,6 +14,7 @@
 #include <memory>
 #include <stop_token>
 #include <string_view>
+#include <vector>
 
 namespace dns
 {
@@ -24,7 +25,7 @@ struct ServerConfig
 {
     std::string bind_ip{"0.0.0.0"};
     std::uint16_t port{default_server_port};
-    std::string blocklist_path{"blocklist.txt"};
+    std::vector<std::string> blocklist_paths{"blocklist.txt"};
     std::size_t worker_count{default_worker_count};
     std::string allowlist_path{"allowlist.txt"};
 };
