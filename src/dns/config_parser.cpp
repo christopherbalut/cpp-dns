@@ -83,6 +83,7 @@ ServerConfig parse_server_config(std::span<char*> args)
         }
     }
 
+    bool saw_cli_blocklist_path{false};
     for (std::size_t i{1}; i < args.size(); ++i)
     {
         const std::string_view arg{args[i]};
@@ -101,7 +102,13 @@ ServerConfig parse_server_config(std::span<char*> args)
         }
         else if (arg == "--blocklist")
         {
-            config.blocklist_paths = {std::string{require_value(args, i, arg)}};
+            if (!saw_cli_blocklist_path)
+            {
+                config.blocklist_paths.clear();
+                saw_cli_blocklist_path = true;
+            }
+
+            config.blocklist_paths.emplace_back(std::string{require_value(args, i, arg)});
         }
         else if (arg == "--allowlist")
         {

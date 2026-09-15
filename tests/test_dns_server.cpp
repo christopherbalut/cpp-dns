@@ -16,6 +16,7 @@
 #include <memory>
 #include <netinet/in.h>
 #include <stdexcept>
+#include <string_view>
 #include <sys/socket.h>
 #include <utility>
 
@@ -236,7 +237,7 @@ TEST(DnsServerFakeResolverTest, BlockedDomainDoesNotCallResolver)
     auto fake_resolver = std::make_shared<FakeResolver>();
 
     ServerConfig config{};
-    config.blocklist_path = path.string();
+    config.blocklist_paths = {path.string()};
 
     DnsServer server{config, fake_resolver};
 
@@ -254,7 +255,7 @@ TEST(DnsServerFakeResolverTest, UnblockedDomainCallsResolver)
     fake_resolver->response = make_fake_upstream_response();
 
     ServerConfig config{};
-    config.blocklist_path = "";
+    config.blocklist_paths.clear();
 
     DnsServer server{config, fake_resolver};
 
@@ -274,7 +275,7 @@ TEST(DnsServerFakeResolverTest, ResolverFailureReturnsServfail)
     fake_resolver->should_throw = true;
 
     ServerConfig config{};
-    config.blocklist_path = "";
+    config.blocklist_paths.clear();
 
     DnsServer server{config, fake_resolver};
 
@@ -297,15 +298,18 @@ TEST(DnsServerTest, AllowlistOverridesBlocklist)
     write_test_domain_file(allowlist_path, "mail.yahoo.com\n");
 
     dns::ServerConfig config{};
-    config.blocklist_path = blocklist_path.string();
+    config.blocklist_paths = {blocklist_path.string()};
     config.allowlist_path = allowlist_path.string();
 
     auto resolver = std::make_shared<FakeResolver>();
+    resolver->response = make_fake_upstream_response();
+
     dns::DnsServer server{config, resolver};
 
     dns::DnsPacket request{};
     request.header.id = 1234;
     request.header.recursion_desired = true;
+
     dns::DnsQuestion question{};
     question.name = "mail.yahoo.com";
     question.qtype = dns::QueryType::A;
@@ -330,7 +334,7 @@ TEST(DnsServerTest, BlocklistStillBlocksNonAllowlistedSubdomain)
     write_test_domain_file(allowlist_path, "mail.yahoo.com\n");
 
     dns::ServerConfig config{};
-    config.blocklist_path = blocklist_path.string();
+    config.blocklist_paths = {blocklist_path.string()};
     config.allowlist_path = allowlist_path.string();
 
     auto resolver = std::make_shared<FakeResolver>();
@@ -339,6 +343,7 @@ TEST(DnsServerTest, BlocklistStillBlocksNonAllowlistedSubdomain)
     dns::DnsPacket request{};
     request.header.id = 1234;
     request.header.recursion_desired = true;
+
     dns::DnsQuestion question{};
     question.name = "ads.yahoo.com";
     question.qtype = dns::QueryType::A;
@@ -353,4 +358,5 @@ TEST(DnsServerTest, BlocklistStillBlocksNonAllowlistedSubdomain)
     std::filesystem::remove(blocklist_path);
     std::filesystem::remove(allowlist_path);
 }
+
 } // namespace dns

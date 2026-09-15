@@ -66,7 +66,8 @@ std::size_t parse_worker_count(std::string_view text)
     return workers;
 }
 
-void apply_config_value(ServerConfig& config, std::string_view key, std::string_view value)
+void apply_config_value(ServerConfig& config, std::string_view key, std::string_view value,
+                        bool& saw_blocklist_path)
 {
     if (key == "bind_ip")
     {
@@ -78,7 +79,13 @@ void apply_config_value(ServerConfig& config, std::string_view key, std::string_
     }
     else if (key == "blocklist_path")
     {
-        config.blocklist_paths = {std::string{value}};
+        if (!saw_blocklist_path)
+        {
+            config.blocklist_paths.clear();
+            saw_blocklist_path = true;
+        }
+
+        config.blocklist_paths.emplace_back(std::string{value});
     }
     else if (key == "allowlist_path")
     {
@@ -105,6 +112,7 @@ ServerConfig load_config_file(const std::filesystem::path& path)
     }
 
     ServerConfig config{};
+    bool saw_blocklist_path{false};
 
     std::string line{};
     std::size_t line_number{0};
@@ -149,7 +157,7 @@ ServerConfig load_config_file(const std::filesystem::path& path)
                                         ": empty value"};
         }
 
-        apply_config_value(config, key, value);
+        apply_config_value(config, key, value, saw_blocklist_path);
     }
 
     return config;

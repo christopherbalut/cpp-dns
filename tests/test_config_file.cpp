@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <string_view>
 
 #include <gtest/gtest.h>
 
@@ -31,8 +32,25 @@ TEST(ConfigFileTest, LoadsBasicConfig)
 
     EXPECT_EQ(config.bind_ip, "127.0.0.1");
     EXPECT_EQ(config.port, 2053);
-    EXPECT_EQ(config.blocklist_path, "blocklist.txt");
+
+    ASSERT_EQ(config.blocklist_paths.size(), 1U);
+    EXPECT_EQ(config.blocklist_paths.at(0), "blocklist.txt");
+
     EXPECT_EQ(config.worker_count, 4U);
+
+    std::filesystem::remove(path);
+}
+
+TEST(ConfigFileTest, LoadsMultipleBlocklistPaths)
+{
+    const std::filesystem::path path = write_temp_config("blocklist_path=ads.txt\n"
+                                                         "blocklist_path=trackers.txt\n");
+
+    const dns::ServerConfig config = dns::load_config_file(path);
+
+    ASSERT_EQ(config.blocklist_paths.size(), 2U);
+    EXPECT_EQ(config.blocklist_paths.at(0), "ads.txt");
+    EXPECT_EQ(config.blocklist_paths.at(1), "trackers.txt");
 
     std::filesystem::remove(path);
 }
@@ -81,12 +99,7 @@ TEST(ConfigFileTest, RejectsInvalidPort)
 
 TEST(ConfigFileTest, LoadsAllowlistPath)
 {
-    const std::filesystem::path path{"test-cpp-dns.conf"};
-
-    {
-        std::ofstream file{path};
-        file << "allowlist_path=allowlist.txt\n";
-    }
+    const std::filesystem::path path = write_temp_config("allowlist_path=allowlist.txt\n");
 
     const dns::ServerConfig config{dns::load_config_file(path)};
 

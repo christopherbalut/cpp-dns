@@ -1,17 +1,25 @@
 #include "dns/config_parser.hpp"
 
-#include <gtest/gtest.h>
-
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <span>
 #include <stdexcept>
 #include <string>
 
+#include <gtest/gtest.h>
+
 namespace dns
 {
 namespace
 {
+
+constexpr std::uint16_t test_server_port{2053};
+constexpr std::uint16_t config_file_port{53};
+constexpr std::size_t one_blocklist_path{1};
+constexpr std::size_t two_blocklist_paths{2};
 
 template <std::size_t N> std::array<char*, N> make_argv(std::array<std::string, N>& args)
 {
@@ -41,20 +49,46 @@ TEST(ConfigParserTest, UsesDefaultsWithNoArguments)
 
     EXPECT_EQ(config.bind_ip, "0.0.0.0");
     EXPECT_EQ(config.port, default_server_port);
-    EXPECT_EQ(config.blocklist_path, "blocklist.txt");
+
+    ASSERT_EQ(config.blocklist_paths.size(), one_blocklist_path);
+    EXPECT_EQ(config.blocklist_paths.at(0), "blocklist.txt");
+
+    EXPECT_EQ(config.allowlist_path, "allowlist.txt");
 }
 
 TEST(ConfigParserTest, ParsesAllOptions)
 {
-    std::array<std::string, 7> args{"cpp_dns_app", "--bind",      "127.0.0.1", "--port",
-                                    "2053",        "--blocklist", "ads.txt"};
+    std::array<std::string, 9> args{
+        "cpp_dns_app", "--bind",  "127.0.0.1",   "--port",        "2053",
+        "--blocklist", "ads.txt", "--allowlist", "allowlist.txt",
+    };
+
     auto argv = make_argv(args);
 
     const ServerConfig config = parse_server_config(make_span(argv));
 
     EXPECT_EQ(config.bind_ip, "127.0.0.1");
-    EXPECT_EQ(config.port, 2053);
-    EXPECT_EQ(config.blocklist_path, "ads.txt");
+    EXPECT_EQ(config.port, test_server_port);
+
+    ASSERT_EQ(config.blocklist_paths.size(), one_blocklist_path);
+    EXPECT_EQ(config.blocklist_paths.at(0), "ads.txt");
+
+    EXPECT_EQ(config.allowlist_path, "allowlist.txt");
+}
+
+TEST(ConfigParserTest, ParsesMultipleBlocklistOptions)
+{
+    std::array<std::string, 5> args{
+        "cpp_dns_app", "--blocklist", "ads.txt", "--blocklist", "trackers.txt",
+    };
+
+    auto argv = make_argv(args);
+
+    const ServerConfig config = parse_server_config(make_span(argv));
+
+    ASSERT_EQ(config.blocklist_paths.size(), two_blocklist_paths);
+    EXPECT_EQ(config.blocklist_paths.at(0), "ads.txt");
+    EXPECT_EQ(config.blocklist_paths.at(1), "trackers.txt");
 }
 
 TEST(ConfigParserTest, ThrowsOnMissingValue)
@@ -89,46 +123,70 @@ TEST(ConfigParserTest, CommandLineOverridesConfigFile)
         std::ofstream file{path};
         file << "bind_ip=0.0.0.0\n";
         file << "port=53\n";
+        file << "blocklist_path=config-blocklist.txt\n";
+        file << "allowlist_path=config-allowlist.txt\n";
         file << "workers=4\n";
     }
 
-    std::array<char, 12> program{"cpp_dns_app"};
-    std::array<char, 9> config_option{"--config"};
-    std::array<char, 18> config_path{"test-cpp-dns.conf"};
-    std::array<char, 7> port_option{"--port"};
-    std::array<char, 5> port_value{"2053"};
-    std::array<char, 10> workers_option{"--workers"};
-    std::array<char, 2> workers_value{"2"};
-
-    std::array<char*, 7> argv{
-        program.data(),    config_option.data(),  config_path.data(),   port_option.data(),
-        port_value.data(), workers_option.data(), workers_value.data(),
+    std::array<std::string, 7> args{
+        "cpp_dns_app", "--config", "test-cpp-dns.conf", "--port", "2053", "--workers", "2",
     };
 
-    const dns::ServerConfig config{
-        dns::parse_server_config(std::span<char*>{argv.data(), argv.size()})};
+    auto argv = make_argv(args);
+
+    const ServerConfig config = parse_server_config(make_span(argv));
+
     EXPECT_EQ(config.bind_ip, "0.0.0.0");
-    EXPECT_EQ(config.port, 2053);
+    EXPECT_EQ(config.port, test_server_port);
     EXPECT_EQ(config.worker_count, 2U);
+
+    ASSERT_EQ(config.blocklist_paths.size(), one_blocklist_path);
+    EXPECT_EQ(config.blocklist_paths.at(0), "config-blocklist.txt");
+
+    EXPECT_EQ(config.allowlist_path, "config-allowlist.txt");
+
+    std::filesystem::remove(path);
+}
+
+TEST(ConfigParserTest, CommandLineBlocklistOverridesConfigFileBlocklist)
+{
+    const std::filesystem::path path{"test-cpp-dns.conf"};
+
+    {
+        std::ofstream file{path};
+        file << "port=53\n";
+        file << "blocklist_path=config-blocklist.txt\n";
+    }
+
+    std::array<std::string, 5> args{
+        "cpp_dns_app", "--config", "test-cpp-dns.conf", "--blocklist", "cli-blocklist.txt",
+    };
+
+    auto argv = make_argv(args);
+
+    const ServerConfig config = parse_server_config(make_span(argv));
+
+    EXPECT_EQ(config.port, config_file_port);
+
+    ASSERT_EQ(config.blocklist_paths.size(), one_blocklist_path);
+    EXPECT_EQ(config.blocklist_paths.at(0), "cli-blocklist.txt");
 
     std::filesystem::remove(path);
 }
 
 TEST(ConfigParserTest, ParsesAllowlistOption)
 {
-    std::array<char, 12> program{"cpp_dns_app"};
-    std::array<char, 12> allowlist_option{"--allowlist"};
-    std::array<char, 14> allowlist_path{"allowlist.txt"};
-
-    std::array<char*, 3> argv{
-        program.data(),
-        allowlist_option.data(),
-        allowlist_path.data(),
+    std::array<std::string, 3> args{
+        "cpp_dns_app",
+        "--allowlist",
+        "allowlist.txt",
     };
 
-    const dns::ServerConfig config{
-        dns::parse_server_config(std::span<char*>{argv.data(), argv.size()})};
+    auto argv = make_argv(args);
+
+    const ServerConfig config = parse_server_config(make_span(argv));
 
     EXPECT_EQ(config.allowlist_path, "allowlist.txt");
 }
+
 } // namespace dns
