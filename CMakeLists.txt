@@ -26,6 +26,9 @@ add_library(cpp_dns
     src/dns/shutdown.cpp
     src/dns/config_file.cpp
     src/dns/allowlist.cpp
+    src/dns/query_log_entry.cpp
+    src/dns/query_logger.cpp
+    src/dns/postgres_query_logger.cpp
 )
 
 target_include_directories(cpp_dns
