@@ -49,6 +49,8 @@ add_executable(cpp_dns_app
 )
 
 target_link_libraries(cpp_dns_app
+    PUBLIC
+        pqxx
     PRIVATE
         cpp_dns
 )
