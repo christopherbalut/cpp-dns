@@ -4,6 +4,7 @@
 #include "dns/blocklist.hpp"
 #include "dns/cache.hpp"
 #include "dns/packet.hpp"
+#include "dns/query_logger.hpp"
 #include "dns/resolver_interface.hpp"
 #include "dns/server_stats.hpp"
 #include "dns/stub_resolver.hpp"
@@ -43,19 +44,23 @@ DnsPacket make_blocked_response(const DnsPacket& request, DnsQuestion question);
 class DnsServer
 {
   public:
-    explicit DnsServer(ServerConfig config = {}, std::shared_ptr<ResolverInterface> resolver =
-                                                     std::make_shared<StubResolver>());
+    explicit DnsServer(
+        ServerConfig config = {},
+        std::shared_ptr<ResolverInterface> resolver = std::make_shared<StubResolver>(),
+        std::shared_ptr<QueryLogger> query_logger = std::make_shared<NoopQueryLogger>());
 
     void run() const;
     void run(std::string_view bind_ip, std::uint16_t port) const;
 
   private:
-    DnsPacket make_response_for_request(DnsPacket request) const;
+    DnsPacket make_response_for_request(DnsPacket request, std::string_view client_ip) const;
     void handle_query(int socket_fd) const;
     void log_stats_periodically(const std::stop_token& stop_token) const;
+    void log_query(const QueryLogEntry& entry) const;
 
     ServerConfig config_;
     std::shared_ptr<ResolverInterface> resolver_;
+    std::shared_ptr<QueryLogger> query_logger_;
     Blocklist blocklist_;
     Allowlist allowlist_;
 
@@ -68,5 +73,8 @@ class DnsServer
     FRIEND_TEST(DnsServerFakeResolverTest, ResolverFailureReturnsServfail);
     FRIEND_TEST(DnsServerTest, AllowlistOverridesBlocklist);
     FRIEND_TEST(DnsServerTest, BlocklistStillBlocksNonAllowlistedSubdomain);
+    FRIEND_TEST(DnsServerLoggingTest, LogsBlockedQuery);
+    FRIEND_TEST(DnsServerLoggingTest, LogsCacheHit);
+    FRIEND_TEST(DnsServerLoggingTest, LogsUpstreamFailure);
 };
 } // namespace dns

@@ -17,12 +17,11 @@ namespace dns
 class PostgresQueryLogger final : public QueryLogger
 {
   public:
-    explicit PostgresQueryLogger(const std::string& connection_string);
     PostgresQueryLogger(const PostgresQueryLogger&) = delete;
     PostgresQueryLogger(PostgresQueryLogger&&) = delete;
     PostgresQueryLogger& operator=(const PostgresQueryLogger&) = delete;
     PostgresQueryLogger& operator=(PostgresQueryLogger&&) = delete;
-    explicit PostgresQueryLogger(std::string connection_string);
+    explicit PostgresQueryLogger(const std::string& connection_string);
 
     ~PostgresQueryLogger() override;
 

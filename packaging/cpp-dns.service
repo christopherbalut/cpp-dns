@@ -5,6 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+EnvironmentFile=-/etc/cpp-dns/database.env
 ExecStart=/usr/local/bin/cpp_dns_app --config /etc/cpp-dns/config.conf
 Restart=on-failure
 RestartSec=2

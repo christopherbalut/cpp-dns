@@ -95,12 +95,38 @@ DnsPacket make_blocked_response(const DnsPacket& request, DnsQuestion question)
     return response;
 }
 
-DnsServer::DnsServer(ServerConfig config, std::shared_ptr<ResolverInterface> resolver)
-    : config_{std::move(config)}, resolver_{std::move(resolver)}, thread_pool_{config_.worker_count}
+std::string get_client_ip(const sockaddr_storage& client_addr)
+{
+    if (client_addr.ss_family != AF_INET)
+    {
+        return "unknown";
+    }
+
+    const auto* ipv4_addr = reinterpret_cast<const sockaddr_in*>(&client_addr);
+
+    char ip_buffer[INET_ADDRSTRLEN]{};
+
+    if (inet_ntop(AF_INET, &ipv4_addr->sin_addr, ip_buffer, sizeof(ip_buffer)) == nullptr)
+    {
+        throw_errno_error("inet_ntop() failed");
+    }
+
+    return ip_buffer;
+}
+
+DnsServer::DnsServer(ServerConfig config, std::shared_ptr<ResolverInterface> resolver,
+                     std::shared_ptr<QueryLogger> query_logger)
+    : config_{std::move(config)}, resolver_{std::move(resolver)},
+      query_logger_{std::move(query_logger)}, thread_pool_{config_.worker_count}
 {
     if (resolver_ == nullptr)
     {
         throw std::invalid_argument("resolver cannot be null");
+    }
+
+    if (query_logger_ == nullptr)
+    {
+        throw std::invalid_argument("query logger cannot be null");
     }
 
     std::size_t total_blocked_domains_loaded{0};
@@ -194,7 +220,19 @@ void DnsServer::log_stats_periodically(const std::stop_token& stop_token) const
     }
 }
 
-DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
+void DnsServer::log_query(const QueryLogEntry& entry) const
+{
+    try
+    {
+        query_logger_->log_query(entry);
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Failed to log DNS query: " << error.what() << '\n';
+    }
+}
+
+DnsPacket DnsServer::make_response_for_request(DnsPacket request, std::string_view client_ip) const
 {
     if (request.questions.empty())
     {
@@ -208,12 +246,34 @@ DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
     if (!allowlist_.contains(question.name) && blocklist_.contains(question.name))
     {
         stats_.record_blocked_queries();
+
+        QueryLogEntry entry{};
+        entry.client_ip = std::string{client_ip};
+        entry.domain = question.name;
+        entry.qtype = question.qtype;
+        entry.response_code = ResultCode::nxdomain;
+        entry.blocked = true;
+        entry.cache_hit = false;
+        entry.forwarded = false;
+
+        log_query(entry);
         return make_blocked_response(request, std::move(question));
     }
 
     if (auto cached = cache_.lookup(question.name, question.qtype))
     {
         stats_.record_cache_hit();
+
+        QueryLogEntry entry{};
+        entry.client_ip = std::string{client_ip};
+        entry.domain = question.name;
+        entry.qtype = question.qtype;
+        entry.response_code = cached->header.rescode;
+        entry.blocked = false;
+        entry.cache_hit = true;
+        entry.forwarded = false;
+
+        log_query(entry);
         return make_forwarded_response(request, std::move(question), std::move(*cached));
     }
 
@@ -228,6 +288,17 @@ DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
 
         cache_.insert(question.name, question.qtype, result);
 
+        QueryLogEntry entry{};
+        entry.client_ip = std::string{client_ip};
+        entry.domain = question.name;
+        entry.qtype = question.qtype;
+        entry.response_code = result.header.rescode;
+        entry.blocked = false;
+        entry.cache_hit = false;
+        entry.forwarded = true;
+
+        log_query(entry);
+
         // copy upstream answers in response
         return make_forwarded_response(request, std::move(question), std::move(result));
     }
@@ -237,6 +308,17 @@ DnsPacket DnsServer::make_response_for_request(DnsPacket request) const
 
         stats_.record_servfail_response();
         stats_.record_upstream_failure();
+
+        QueryLogEntry entry{};
+        entry.client_ip = std::string{client_ip};
+        entry.domain = question.name;
+        entry.qtype = question.qtype;
+        entry.response_code = ResultCode::servfail;
+        entry.blocked = false;
+        entry.cache_hit = false;
+        entry.forwarded = true;
+
+        log_query(entry);
 
         // if upstream fails, return SERVFAIL
         return make_servfail_response(request, std::move(question));
@@ -288,6 +370,7 @@ void DnsServer::handle_query(int socket_fd) const
             {
                 DnsPacket request{};
                 request.decode_from_buffer(request_packet);
+                const std::string client_ip{get_client_ip(client_addr)};
 
                 DnsPacket response{};
 
@@ -298,7 +381,7 @@ void DnsServer::handle_query(int socket_fd) const
                 }
                 else
                 {
-                    response = make_response_for_request(std::move(request));
+                    response = make_response_for_request(std::move(request), client_ip);
                 }
 
                 PacketBuffer response_buffer{};

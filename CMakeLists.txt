@@ -8,6 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+find_package(libpqxx REQUIRED)
+
 add_library(cpp_dns
     src/dns/buffer.cpp
     src/dns/header.cpp
@@ -36,6 +38,11 @@ target_include_directories(cpp_dns
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+target_link_libraries(cpp_dns
+    PUBLIC
+        libpqxx::pqxx
+)
+
 target_compile_options(cpp_dns
     PRIVATE
         -Wall
@@ -49,8 +56,6 @@ add_executable(cpp_dns_app
 )
 
 target_link_libraries(cpp_dns_app
-    PUBLIC
-        pqxx
     PRIVATE
         cpp_dns
 )
@@ -65,7 +70,7 @@ target_compile_options(cpp_dns_app
 
 include(CTest)
 
-if (BUILD_TESTING)
+if(BUILD_TESTING)
     find_package(GTest REQUIRED)
     include(GoogleTest)
 
@@ -87,6 +92,7 @@ if (BUILD_TESTING)
         tests/test_cache.cpp
         tests/test_config_file.cpp
         tests/test_config_parser.cpp
+        tests/test_postgres_query_logger.cpp
     )
 
     target_link_libraries(dns_tests
