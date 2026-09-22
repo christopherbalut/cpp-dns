@@ -1,38 +1,47 @@
-#include "dns/packet.hpp"
+#include "dns/config_parser.hpp"
+#include "dns/postgres_query_logger.hpp"
+#include "dns/query_logger.hpp"
+#include "dns/server.hpp"
+#include "dns/shutdown.hpp"
 #include "dns/stub_resolver.hpp"
-#include "dns/types.hpp"
 
+#include <cstddef>
+#include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <memory>
+#include <span>
 
-int main()
+int main(int argc, char* argv[])
 {
     try
     {
-        dns::StubResolver resolver{};
-        dns::DnsPacket response_packet = resolver.lookup("www.yahoo.com", dns::QueryType::A);
+        dns::install_shutdown_signal_handlers();
 
-        std::cout << response_packet.header;
+        const dns::ServerConfig config =
+            dns::parse_server_config(std::span<char*>{argv, static_cast<std::size_t>(argc)});
 
-        for (const auto& question : response_packet.questions)
+        std::shared_ptr<dns::QueryLogger> query_logger{std::make_shared<dns::NoopQueryLogger>()};
+
+        if (const char* database_url = std::getenv("CPP_DNS_DATABASE_URL"); database_url != nullptr)
         {
-            std::cout << question;
+            try
+            {
+                query_logger = std::make_shared<dns::PostgresQueryLogger>(database_url);
+
+                std::cout << "PostgreSQL query logging enabled\n";
+            }
+            catch (const std::exception& error)
+            {
+                std::cerr << "Failed to enable PostgreSQL query logging: " << error.what() << '\n';
+
+                std::cerr << "Continuing without database logging\n";
+            }
         }
 
-        for (const auto& record : response_packet.answers)
-        {
-            std::cout << record;
-        }
+        dns::DnsServer server{config, std::make_shared<dns::StubResolver>(), query_logger};
 
-        for (const auto& record : response_packet.authorities)
-        {
-            std::cout << record;
-        }
-
-        for (const auto& record : response_packet.resources)
-        {
-            std::cout << record;
-        }
+        server.run();
     }
     catch (const std::exception& error)
     {

@@ -8,6 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+find_package(libpqxx REQUIRED)
+
 add_library(cpp_dns
     src/dns/buffer.cpp
     src/dns/header.cpp
@@ -15,11 +17,30 @@ add_library(cpp_dns
     src/dns/question.cpp
     src/dns/record.cpp
     src/dns/stub_resolver.cpp
+    src/dns/server.cpp
+    src/dns/socket_utils.cpp
+    src/dns/server_stats.cpp
+    src/dns/domain_name.cpp
+    src/dns/blocklist.cpp
+    src/dns/config_parser.cpp
+    src/dns/thread_pool.cpp
+    src/dns/cache.cpp
+    src/dns/shutdown.cpp
+    src/dns/config_file.cpp
+    src/dns/allowlist.cpp
+    src/dns/query_log_entry.cpp
+    src/dns/query_logger.cpp
+    src/dns/postgres_query_logger.cpp
 )
 
 target_include_directories(cpp_dns
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(cpp_dns
+    PUBLIC
+        libpqxx::pqxx
 )
 
 target_compile_options(cpp_dns
@@ -49,7 +70,7 @@ target_compile_options(cpp_dns_app
 
 include(CTest)
 
-if (BUILD_TESTING)
+if(BUILD_TESTING)
     find_package(GTest REQUIRED)
     include(GoogleTest)
 
@@ -63,6 +84,15 @@ if (BUILD_TESTING)
         tests/test_query_type.cpp
         tests/test_result_code.cpp
         tests/test_sanity_check.cpp
+        tests/test_dns_server.cpp
+        tests/test_server_stats.cpp
+        tests/test_domain_name.cpp
+        tests/test_blocklist.cpp
+        tests/test_thread_pool.cpp
+        tests/test_cache.cpp
+        tests/test_config_file.cpp
+        tests/test_config_parser.cpp
+        tests/test_postgres_query_logger.cpp
     )
 
     target_link_libraries(dns_tests
@@ -80,4 +110,11 @@ if (BUILD_TESTING)
     )
 
     gtest_discover_tests(dns_tests)
+endif()
+
+option(ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+
+if(ENABLE_TSAN)
+    add_compile_options(-fsanitize=thread -g)
+    add_link_options(-fsanitize=thread)
 endif()

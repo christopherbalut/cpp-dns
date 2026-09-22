@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dns/packet.hpp"
+#include "dns/resolver_interface.hpp"
 #include "dns/types.hpp"
 
 #include <string>
@@ -9,14 +10,14 @@
 namespace dns
 {
 
-class StubResolver
+class StubResolver : public ResolverInterface
 {
   public:
     StubResolver();
 
     StubResolver(std::string server_ip, std::string server_port);
 
-    [[nodiscard]] DnsPacket lookup(std::string_view name, QueryType qtype) const;
+    [[nodiscard]] DnsPacket lookup(std::string_view name, QueryType qtype) const override;
 
   private:
     [[nodiscard]] static DnsPacket make_query_packet(std::string name, QueryType qtype);
