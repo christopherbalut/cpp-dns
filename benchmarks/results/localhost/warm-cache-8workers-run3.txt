@@ -1,0 +1,23 @@
+DNS Performance Testing Tool
+Version 2.16.0
+
+[Status] Command line: dnsperf -s 127.0.0.1 -p 2053 -d benchmarks/warm-cache.txt -l 10 -c 1 -T 1
+[Status] Sending queries (to 127.0.0.1:2053)
+[Status] Started at: Mon Sep 21 20:51:58 2026
+[Status] Stopping after 10.000000 seconds
+[Status] Testing complete (time limit)
+
+Statistics:
+
+  Queries sent:         1198126
+  Queries completed:    1198126 (100.00%)
+  Queries lost:         0 (0.00%)
+
+  Response codes:       NOERROR 1198126 (100.00%)
+  Average packet size:  request 28, response 184
+  Run time (s):         10.000252
+  Queries per second:   119809.580799
+
+  Average Latency (s):  0.000459 (min 0.000019, max 0.009633)
+  Latency StdDev (s):   0.000330
+

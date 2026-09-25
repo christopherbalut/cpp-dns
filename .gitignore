@@ -46,3 +46,4 @@ Thumbs.db
 buf.txt
 .cache/
 blocklist.txt
+build-release/
