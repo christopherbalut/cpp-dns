@@ -1,37 +1,31 @@
-cpp-dns
+# cpp-dns
 
-A modern C++ DNS server built to explore DNS protocol parsing, UDP networking, concurrency, caching, filtering, and server design.
+A C++20 DNS server built to explore DNS packet parsing, UDP networking, concurrency, caching, filtering, and server design.
 
-Features
+![C++](https://img.shields.io/badge/C%2B%2B-20-blue)
+![CMake](https://img.shields.io/badge/build-CMake-blue)
+![Tests](https://img.shields.io/badge/tests-GoogleTest-green)
+![Platform](https://img.shields.io/badge/platform-Linux-lightgrey)
 
-DNS packet encoding and decoding
+## Features
 
-compressed domain-name parsing
+- DNS packet encoding and decoding
+- compressed domain-name parsing
+- support for `A`, `AAAA`, `NS`, `CNAME`, and `MX` records
+- UDP DNS server
+- upstream DNS resolution
+- concurrent request handling with a thread pool
+- thread-safe DNS cache
+- domain blocklist and allowlist
+- runtime server statistics
+- configuration file support
+- graceful shutdown
+- PostgreSQL integration
+- GoogleTest test suite
 
-support for common DNS record types
+## Architecture
 
-UDP DNS server and upstream stub resolver
-
-thread pool for concurrent query handling
-
-thread-safe DNS cache
-
-blocklist and allowlist filtering
-
-server statistics
-
-configuration file support
-
-graceful shutdown
-
-PostgreSQL integration
-
-RAII-based socket management
-
-GoogleTest test suite
-
-Architecture
-
+```text
 Client
   │
   ▼
@@ -41,121 +35,79 @@ DnsServer
 ThreadPool
   │
   ▼
-DnsPacket
+DNS Packet Parsing
   │
-  ├── Filtering
+  ├── Blocklist / Allowlist
   ├── Cache
-  │
-  └── StubResolver ──► Upstream DNS
+  └── StubResolver ──────► Upstream DNS
   │
   ▼
 Response
+```
 
-DNS Support
+## Project Structure
 
-The project implements DNS packet handling directly in C++, including:
-
-headers
-
-questions
-
-records
-
-packet serialization
-
-compressed domain names
-
-Supported record types include:
-
-A
-
-AAAA
-
-NS
-
-CNAME
-
-MX
-
-unknown record types
-
-Project Structure
-
+```text
 cpp-dns/
 ├── apps/          # Executables
-├── docs/          # Notes and documentation
+├── docs/          # Documentation and notes
 ├── include/dns/   # Public headers
-├── scripts/       # Build helpers
-├── src/dns/       # Implementations
+├── scripts/       # Build scripts
+├── src/dns/       # Implementation
 ├── tests/         # GoogleTest suite
 └── CMakeLists.txt
+```
 
-Requirements
+## Build
 
-C++20
+### Requirements
 
-CMake 3.20+
+- C++20 compatible compiler
+- CMake 3.20+
+- PostgreSQL
+- libpqxx
+- GoogleTest
 
-GoogleTest
+Configure and build:
 
-PostgreSQL
-
-libpqxx
-
-Build
-
+```bash
 ./scripts/configure.sh
 ./scripts/build.sh
+```
 
-Or directly with CMake:
+Or with CMake directly:
 
+```bash
 cmake -S . -B build
 cmake --build build
+```
 
-Run
+## Usage
 
-Start the server, then query it using dig:
+Start the DNS server and query it using `dig`:
 
+```bash
 dig @127.0.0.1 -p 2053 example.com
+```
 
-For a specific record type:
+Query a specific record type:
 
+```bash
 dig @127.0.0.1 -p 2053 example.com AAAA
+```
 
-Testing
+## Testing
 
+Run the test suite with:
+
+```bash
 ctest --test-dir build --output-on-failure
+```
 
-Tests cover DNS parsing, packet handling, caching, filtering, and server utilities.
+## Future Work
 
-Motivation
-
-cpp-dns began as a packet-parsing project and evolved into a larger systems programming project focused on:
-
-networking
-
-binary protocols
-
-modern C++
-
-concurrency
-
-caching
-
-server architecture
-
-testing and deployment
-
-Future Work
-
-TTL-aware cache expiration
-
-performance benchmarks
-
-additional DNS record types
-
-improved observability
-
-more advanced filtering
-
-resolver timeout and retry policies
+- TTL-aware cache expiration
+- performance benchmarking
+- additional DNS record types
+- improved logging and observability
+- more advanced filtering rules
