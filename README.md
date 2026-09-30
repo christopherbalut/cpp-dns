@@ -1,347 +1,161 @@
-# cpp-dns
+cpp-dns
 
-A DNS server written in modern C++ with support for DNS packet parsing and serialization, UDP networking, concurrent request handling, caching, filtering, configuration, and persistent data storage.
+A modern C++ DNS server built to explore DNS protocol parsing, UDP networking, concurrency, caching, filtering, and server design.
 
-The project is built primarily as a systems programming project for exploring networking protocols, resource management, concurrency, and server architecture in C++.
+Features
 
----
+DNS packet encoding and decoding
 
-## Features
+compressed domain-name parsing
 
-- DNS packet encoding and decoding
-- DNS name compression parsing
-- UDP-based DNS server
-- Stub resolver for forwarding DNS queries
-- Support for common DNS record types
-- Multithreaded request handling with a thread pool
-- Thread-safe DNS cache
-- Domain blocklist and allowlist filtering
-- Runtime server statistics
-- Configuration file support
-- Graceful server shutdown
-- PostgreSQL integration
-- RAII-based socket management
-- GoogleTest unit test suite
+support for common DNS record types
 
----
+UDP DNS server and upstream stub resolver
 
-## Architecture
+thread pool for concurrent query handling
 
-A DNS request moves through the server roughly as follows:
+thread-safe DNS cache
 
-```text
+blocklist and allowlist filtering
+
+server statistics
+
+configuration file support
+
+graceful shutdown
+
+PostgreSQL integration
+
+RAII-based socket management
+
+GoogleTest test suite
+
+Architecture
+
 Client
   │
-  │ DNS Query
   ▼
-┌─────────────────┐
-│    DnsServer    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Thread Pool   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Packet Parsing  │
-│   DnsPacket     │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Filtering       │
-│ Block / Allow   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│      Cache      │
-└────────┬────────┘
-         │ miss
-         ▼
-┌─────────────────┐
-│  Stub Resolver  │
-│ Upstream DNS    │
-└────────┬────────┘
-         │
-         ▼
-      Response
-```
+DnsServer
+  │
+  ▼
+ThreadPool
+  │
+  ▼
+DnsPacket
+  │
+  ├── Filtering
+  ├── Cache
+  │
+  └── StubResolver ──► Upstream DNS
+  │
+  ▼
+Response
 
-The project separates DNS protocol logic from networking and server infrastructure so that packet parsing, caching, filtering, and request handling can be developed and tested independently.
+DNS Support
 
----
+The project implements DNS packet handling directly in C++, including:
 
-## DNS Protocol Support
+headers
 
-The DNS implementation provides structured C++ representations of DNS packets and their components.
+questions
 
-### Packet handling
+records
 
-- `PacketBuffer`
-- DNS header parsing and serialization
-- DNS question parsing
-- DNS record parsing
-- DNS packet encoding and decoding
-- compressed domain-name decoding
-- DNS response construction
+packet serialization
 
-### Record types
+compressed domain names
 
-Support includes common DNS record types such as:
+Supported record types include:
 
-- `A`
-- `AAAA`
-- `NS`
-- `CNAME`
-- `MX`
+A
 
-Unknown record types can also be represented without breaking packet decoding.
+AAAA
 
----
+NS
 
-## Server Components
+CNAME
 
-### `DnsServer`
+MX
 
-Responsible for:
+unknown record types
 
-- binding the UDP socket
-- receiving DNS queries
-- dispatching requests
-- constructing DNS responses
-- sending responses back to clients
+Project Structure
 
-### `StubResolver`
-
-Forwards DNS queries to an upstream DNS resolver when a result cannot be answered locally.
-
-### `ThreadPool`
-
-Provides concurrent query processing using a fixed pool of worker threads rather than creating a new thread for every request.
-
-### `Cache`
-
-Stores previously resolved DNS responses to avoid unnecessary upstream queries.
-
-The cache is designed to support concurrent access from server worker threads.
-
-### Filtering
-
-The server supports domain filtering through:
-
-- blocklists
-- allowlists
-
-This allows the DNS server to act as a basic DNS filtering service.
-
-### Server Statistics
-
-Runtime statistics can be collected for server activity, allowing query handling behavior to be observed while the server is running.
-
----
-
-## Project Structure
-
-```text
 cpp-dns/
-├── apps/              # Executable entry points
-├── docs/              # Design notes and documentation
-├── include/
-│   └── dns/           # Public headers
-├── scripts/           # Build and helper scripts
-├── src/
-│   └── dns/           # Implementations
-├── tests/             # GoogleTest test suite
+├── apps/          # Executables
+├── docs/          # Notes and documentation
+├── include/dns/   # Public headers
+├── scripts/       # Build helpers
+├── src/dns/       # Implementations
+├── tests/         # GoogleTest suite
 └── CMakeLists.txt
-```
 
-Some of the major components include:
+Requirements
 
-```text
-buffer
-packet
-header
-question
-record
-domain_name
+C++20
 
-server
-stub_resolver
-socket_utils
+CMake 3.20+
 
-thread_pool
-cache
-server_stats
+GoogleTest
 
-blocklist
-allowlist
+PostgreSQL
 
-config_parser
-config_file
-shutdown
-```
+libpqxx
 
----
+Build
 
-## Requirements
-
-The project uses:
-
-- C++20
-- CMake 3.20+
-- a C++20-compatible compiler
-- GoogleTest
-- PostgreSQL
-- libpqxx
-
-On Linux, GCC or Clang can be used.
-
----
-
-## Building
-
-The project includes helper scripts for configuring and building the server.
-
-Configure the build:
-
-```bash
 ./scripts/configure.sh
-```
-
-Build the project:
-
-```bash
 ./scripts/build.sh
-```
 
-Alternatively, the project can be built directly with CMake:
+Or directly with CMake:
 
-```bash
 cmake -S . -B build
 cmake --build build
-```
 
----
+Run
 
-## Running
+Start the server, then query it using dig:
 
-After building the project, run the DNS server executable from the build directory.
-
-The server binds to the configured IP address and UDP port and begins accepting DNS queries.
-
-For local development, a non-privileged port such as `2053` can be used.
-
-A query can then be sent using `dig`:
-
-```bash
 dig @127.0.0.1 -p 2053 example.com
-```
 
 For a specific record type:
 
-```bash
-dig @127.0.0.1 -p 2053 example.com A
-```
-
-```bash
 dig @127.0.0.1 -p 2053 example.com AAAA
-```
 
----
+Testing
 
-## Testing
-
-The project uses GoogleTest for automated testing.
-
-Run the test suite with:
-
-```bash
 ctest --test-dir build --output-on-failure
-```
 
-Tests cover components such as:
+Tests cover DNS parsing, packet handling, caching, filtering, and server utilities.
 
-- packet buffers
-- DNS headers
-- DNS questions
-- DNS records
-- DNS packets
-- domain-name parsing
-- result codes
-- caching
-- filtering
-- server utilities
+Motivation
 
----
+cpp-dns began as a packet-parsing project and evolved into a larger systems programming project focused on:
 
-## Design Goals
+networking
 
-The project is intentionally structured around several systems-programming concepts.
+binary protocols
 
-### Protocol parsing
+modern C++
 
-DNS packets are parsed directly from their wire representation rather than relying on a high-level DNS library.
+concurrency
 
-This includes handling variable-length fields and compressed domain names.
+caching
 
-### Resource management
+server architecture
 
-Operating-system resources such as sockets are managed using RAII so that ownership and cleanup follow normal C++ object lifetimes.
+testing and deployment
 
-### Concurrency
+Future Work
 
-DNS requests can be processed concurrently through a worker thread pool.
+TTL-aware cache expiration
 
-Shared components such as the cache and statistics system are designed with concurrent access in mind.
+performance benchmarks
 
-### Separation of concerns
+additional DNS record types
 
-Protocol representation, networking, request handling, caching, filtering, and configuration are kept as separate components.
+improved observability
 
-This keeps the system easier to test and allows individual pieces to evolve independently.
+more advanced filtering
 
----
-
-## Motivation
-
-`cpp-dns` started as a way to understand DNS at the packet level and gradually evolved into a larger systems programming project.
-
-The project is intended to explore areas including:
-
-- network programming
-- binary protocol parsing
-- modern C++ resource management
-- concurrency
-- caching
-- server architecture
-- testing
-- persistent storage
-- Linux deployment
-
-Rather than using an existing DNS library for the protocol layer, the DNS packet representation and parsing logic are implemented directly in C++.
-
----
-
-## Future Work
-
-Possible extensions include:
-
-- cache expiration based on DNS TTL values
-- additional DNS record types
-- improved server observability
-- more advanced filtering rules
-- persistent query statistics
-- performance benchmarking
-- load testing
-- resolver retry and timeout policies
-- IPv6 server support
-- additional deployment tooling
-
----
-
-## License
-
-This project is intended primarily for educational and experimental use.
+resolver timeout and retry policies
